@@ -9,6 +9,7 @@ export interface Workflow {
 export interface Run {
   id: number;
   status: string;
+  html_url: string;
 }
 
 export interface GitHub {

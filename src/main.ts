@@ -12,8 +12,10 @@ async function waitForIt(
 ) {
   const run = await github.run(owner, repo, run_id);
   if (run.status === "completed") {
+    info("ready. moving forward");
     return;
   } else {
+    info(`awaiting run ${run.html_url}...`);
     return new Promise(resolve => setTimeout(resolve, minutes * 60 * 1000));
   }
 }
