@@ -1,4 +1,5 @@
 import { Octokit } from "@octokit/rest";
+import { debug, warning } from "@actions/core";
 
 export interface Workflow {
   id: string;
@@ -28,21 +29,19 @@ export class OctokitGitHub implements GitHub {
       auth: githubToken,
       throttle: {
         onRateLimit: (retryAfter, options) => {
-          console.warn(
+          warning(
             `Request quota exhausted for request ${options.method} ${options.url}`
           );
 
           if (options.request.retryCount === 0) {
             // only retries once
-            console.debug(`Retrying after ${retryAfter} seconds!`);
+            debug(`Retrying after ${retryAfter} seconds!`);
             return true;
           }
         },
         onAbuseLimit: (retryAfter, options) => {
           // does not retry, only logs a warning
-          console.debug(
-            `Abuse detected for request ${options.method} ${options.url}`
-          );
+          debug(`Abuse detected for request ${options.method} ${options.url}`);
         }
       }
     });
