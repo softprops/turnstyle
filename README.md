@@ -1,4 +1,4 @@
-<div align="center" style="font-size:2em">
+<div align="center" size="2em">
   🎟️
 </div>
 
