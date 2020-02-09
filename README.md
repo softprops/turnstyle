@@ -26,7 +26,7 @@ This can be problematic for workflows used as part of a continuous deployment pr
 
 ## 🤸 Usage
 
-The typical setup for diffset involves adding job step using `softprops/turnstyle@master`.
+The typical setup for turnstyle involves adding job step using `softprops/turnstyle@master`.
 
 ```diff
 name: Main
