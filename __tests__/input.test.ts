@@ -1,11 +1,11 @@
 import * as assert from "assert";
-import { parseConfig } from "../src/main";
+import { parseInput } from "../src/input";
 
-describe("main", () => {
-  describe("parseConfig", () => {
+describe("input", () => {
+  describe("parseInput", () => {
     it("parses config from env", () => {
       assert.deepEqual(
-        parseConfig({
+        parseInput({
           GITHUB_TOKEN: "s3cr3t",
           GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
