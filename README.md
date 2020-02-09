@@ -1,6 +1,6 @@
-<h1 align="center">
+<div align="center">
   🎟️
-</h1>
+</div>
 
 <h1 align="center">
   turnstyle
