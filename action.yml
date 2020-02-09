@@ -1,0 +1,15 @@
+# https://help.github.com/en/articles/metadata-syntax-for-github-actions
+name: 'turnstyle'
+description: 'A GitHub Action for serializing workflow runs'
+author: 'softprops'
+env:
+  'GITHUB_TOKEN': 'Repository token provided by Github Actions secrets'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
+inputs:
+  base:
+    description: "Base branch to compare with (defaults to master)"
+branding:
+  color: 'green'
+  icon: 'activity'

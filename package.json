@@ -1,0 +1,51 @@
+{
+  "name": "turnstyle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Action for limiting one workflow to complete at a time",
+  "main": "lib/main.js",
+  "scripts": {
+    "build": "ncc build src/main.ts --minify",
+    "test": "jest --coverage",
+    "fmt": "prettier --write 'src/**/*.ts' '__tests__/**/*.ts'",
+    "fmtcheck": "prettier --check 'src/**/*.ts' '__tests__/**/*.ts'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/softprops/diffset.git"
+  },
+  "keywords": [
+    "actions"
+  ],
+  "author": "softprops",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.2.2",
+    "@octokit/rest": "^16.43.1",
+    "@octokit/plugin-throttling": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.25",
+    "@types/node": "^12.12.24",
+    "@zeit/ncc": "^0.21.0",
+    "husky": "^4.0.10",
+    "jest": "^24.9.0",
+    "jest-circus": "^24.9.0",
+    "lint-staged": "^9.5.0",
+    "nock": "^11.7.2",
+    "prettier": "1.19.1",
+    "ts-jest": "^24.2.0",
+    "typescript": "^3.7.4"
+  },
+  "lint-staged": {
+    "{__tests__,src}/**/*.ts": [
+      "npm run fmt",
+      "git add"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  }
+}
