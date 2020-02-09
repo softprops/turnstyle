@@ -2,7 +2,7 @@ import { setFailed, debug, warning, info } from "@actions/core";
 import { env } from "process";
 import { Octokit } from "@octokit/rest";
 
-interface Config {
+export interface Config {
   githubToken: string;
   owner: string;
   repo: string;
@@ -11,17 +11,17 @@ interface Config {
   runId: number;
 }
 
-interface Workflow {
+export interface Workflow {
   id: string;
   name: string;
 }
 
-interface Run {
+export interface Run {
   id: string;
   status: string;
 }
 
-interface GitHub {
+export interface GitHub {
   workflows: (owner: string, repo: string) => Promise<Array<Workflow>>;
   runs: (
     owner: string,
@@ -31,7 +31,7 @@ interface GitHub {
   ) => Promise<Array<Run>>;
 }
 
-class OctokitGitHub implements GitHub {
+export class OctokitGitHub implements GitHub {
   private readonly octokit: Octokit;
   constructor(octokit: Octokit) {
     this.octokit = octokit;
@@ -63,7 +63,9 @@ class OctokitGitHub implements GitHub {
   };
 }
 
-const parseConfig = (env: Record<string, string | undefined>): Config => {
+export const parseConfig = (
+  env: Record<string, string | undefined>
+): Config => {
   const githubToken = env.GITHUB_TOKEN || "";
   const [owner, repo] = (env.GITHUB_REPOSITORY || "").split("/");
   const workflowName = env.GITHUB_WORKFLOW || "";
