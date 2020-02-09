@@ -12,12 +12,12 @@ async function waitForIt(
 ) {
   const run = await github.run(owner, repo, run_id);
   if (run.status === "completed") {
-    info("ready. moving forward");
+    info(`Run ${run.html_url} complete.`);
     return;
-  } else {
-    info(`awaiting run ${run.html_url}...`);
-    return new Promise(resolve => setTimeout(resolve, minutes * 60 * 1000));
   }
+  info(`awaiting run ${run.html_url}...`);
+  await new Promise(resolve => setTimeout(resolve, minutes * 60 * 1000));
+  return waitForIt(minutes, github, owner, repo, run_id);
 }
 
 async function run() {
@@ -41,9 +41,7 @@ async function run() {
         .filter(run => run.id < runId)
         .sort((a, b) => a.id - b.id)[0];
       if (previousRun) {
-        info("previous run");
-        info(JSON.stringify(previousRun, null, 2));
-        await waitForIt(1, github, owner, repo, runId);
+        await waitForIt(1, github, owner, repo, previousRun.id);
       }
     }
   } catch (error) {
