@@ -64,4 +64,4 @@ The following are *required* as `step.env` keys
 |----------------|--------------------------------------|
 | `GITHUB_TOKEN` | GITHUB_TOKEN as provided by `secrets`|
 
-Doug Tangren (softprops) 2020
+Doug Tangren (softprops) 2020.
