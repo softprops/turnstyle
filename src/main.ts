@@ -1,7 +1,22 @@
 import { setFailed, info } from "@actions/core";
 import { env } from "process";
 import { parseInput } from "./input";
-import { OctokitGitHub } from "./github";
+import { GitHub, OctokitGitHub, Run } from "./github";
+
+async function waitForIt(
+  minutes: number,
+  github: GitHub,
+  owner: string,
+  repo: string,
+  run_id: number
+) {
+  const run = await github.run(owner, repo, run_id);
+  if (run.status === "completed") {
+    return;
+  } else {
+    return new Promise(resolve => setTimeout(resolve, minutes * 60 * 1000));
+  }
+}
 
 async function run() {
   try {
@@ -20,19 +35,13 @@ async function run() {
     )?.id;
     if (workflow_id) {
       const runs = await github.runs(owner, repo, branch, workflow_id);
-      info(
-        `runs for workflow ${workflow_id} on branch ${branch} ${JSON.stringify(
-          runs,
-          null,
-          2
-        )}`
-      );
       const previousRun = runs
         .filter(run => run.id < runId)
         .sort((a, b) => a.id - b.id)[0];
       if (previousRun) {
         info("previous run");
         info(JSON.stringify(previousRun, null, 2));
+        await waitForIt(1, github, owner, repo, runId);
       }
     }
   } catch (error) {
