@@ -18,7 +18,7 @@
 
 <br />
 
-## ⚡ why bother
+## 🤔 why bother
 
 GitHub actions is event-oriented. Your workflows are run in response to events independently and without coordination. For example, in a shared repository if two or more different
 people merge pull requests those will each trigger workflows each without regard to one another.
