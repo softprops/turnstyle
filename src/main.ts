@@ -119,7 +119,10 @@ async function run() {
     const workflows = await github.workflows(owner, repo);
     const workflow_id =
       workflows.find(workflow => workflow.name == workflowName)?.id || 0;
+    info(`workflow named ${workflowName}`);
+    info(workflow_id);
     const runs = await github.runs(owner, repo, branch, workflow_id);
+    info(`runs ${runs}`);
     const previousRun = runs
       .filter(run => run.id < runId)
       .sort((a, b) => a.id - b.id)[0];
