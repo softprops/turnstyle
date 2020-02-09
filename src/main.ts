@@ -69,7 +69,7 @@ export const parseConfig = (
   const githubToken = env.GITHUB_TOKEN || "";
   const [owner, repo] = (env.GITHUB_REPOSITORY || "").split("/");
   const workflowName = env.GITHUB_WORKFLOW || "";
-  const branch = env.GITHUB_REF || "master";
+  const branch = env.GITHUB_REF?.substring(11) || "master";
   const runId = parseInt(env.GITHUB_RUN_ID || "0", 10);
   return {
     githubToken,
@@ -122,7 +122,7 @@ async function run() {
     info(`workflow named ${workflowName}`);
     info(workflow_id);
     const runs = await github.runs(owner, repo, branch, workflow_id);
-    info(`runs ${runs}`);
+    info(`runs for workflow ${workflow_id} on branch ${branch} ${runs}`);
     const previousRun = runs
       .filter(run => run.id < runId)
       .sort((a, b) => a.id - b.id)[0];

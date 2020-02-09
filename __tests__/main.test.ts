@@ -7,7 +7,7 @@ describe("main", () => {
       assert.deepEqual(
         parseConfig({
           GITHUB_TOKEN: "s3cr3t",
-          GITHUB_REF: "refs/heads/master",
+          GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1"
@@ -16,7 +16,7 @@ describe("main", () => {
           githubToken: "s3cr3t",
           owner: "softprops",
           repo: "turnstyle",
-          branch: "refs/heads/master",
+          branch: "foo",
           workflowName: "test",
           runId: 1
         }
