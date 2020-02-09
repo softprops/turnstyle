@@ -22,8 +22,30 @@ export interface GitHub {
 
 export class OctokitGitHub implements GitHub {
   private readonly octokit: Octokit;
-  constructor(octokit: Octokit) {
-    this.octokit = octokit;
+  constructor(githubToken: string) {
+    Octokit.plugin(require("@octokit/plugin-throttling"));
+    this.octokit = new Octokit({
+      auth: githubToken,
+      throttle: {
+        onRateLimit: (retryAfter, options) => {
+          console.warn(
+            `Request quota exhausted for request ${options.method} ${options.url}`
+          );
+
+          if (options.request.retryCount === 0) {
+            // only retries once
+            console.debug(`Retrying after ${retryAfter} seconds!`);
+            return true;
+          }
+        },
+        onAbuseLimit: (retryAfter, options) => {
+          // does not retry, only logs a warning
+          console.debug(
+            `Abuse detected for request ${options.method} ${options.url}`
+          );
+        }
+      }
+    });
   }
 
   workflows = async (owner: string, repo: string) =>
