@@ -1,6 +1,5 @@
 import { setFailed, debug, warning, info } from "@actions/core";
 import { env } from "process";
-import { Octokit } from "@octokit/rest";
 import { parseInput } from "./input";
 import { OctokitGitHub } from "./github";
 
