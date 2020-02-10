@@ -31,7 +31,7 @@ async function run() {
           () => github.run(owner, repo, previousRun.id),
           pollIntervalSeconds,
           continueAfterSeconds
-        ).wait(0);
+        ).wait();
       }
     }
   } catch (error) {
