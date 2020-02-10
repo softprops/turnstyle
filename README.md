@@ -49,7 +49,7 @@ jobs:
 
 To avoid waiting prolonged periods of time, you may wish to bail on a run or continuing a workflow run regardless of the status of the previous run.
 
-You can bail from a run using the built in GitHub actions [`jobs.<job_id>.timeout-minutes`](https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#jobsjob_idtimeout-minutes)
+You can bail from a run using the built-in GitHub Actions [`jobs.<job_id>.timeout-minutes`](https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#jobsjob_idtimeout-minutes) setting
 
 ```diff
 name: Main
@@ -71,7 +71,7 @@ jobs:
         run: sleep 30
 ```
 
-You can also limit how long a you're willing to wait before going again and progressing a workflow run with `jobs.<job_id>.steps.with.timeout-seconds`
+You can also limit how long a you're willing to wait before moving on with `jobs.<job_id>.steps.with.continue-after-seconds`
 
 ```diff
 name: Main
@@ -115,6 +115,6 @@ The following are *required* as `step.env` keys
 
 ## cost of coordination
 
-At this time there is no way to coodinate between workflow runs beyond waiting. For those using private repositories [you are charged based on the time your workflow spends running](https://github.com/features/actions#pricing-details). Waiting within one workflow run for another to complete will incur the cost of the time spent waiting.
+At this time there is no way to coordinate between workflow runs beyond waiting. For those using private repositories, [you are charged based on the time your workflow spends running](https://github.com/features/actions#pricing-details). Waiting within one workflow run for another to complete will incur the cost of the time spent waiting.
 
 Doug Tangren (softprops) 2020
