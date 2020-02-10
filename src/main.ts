@@ -28,10 +28,7 @@ async function run() {
         .sort((a, b) => a.id - b.id)[0];
       if (previousRun) {
         await new Waiter(
-          github,
-          owner,
-          repo,
-          previousRun.id,
+          () => github.run(owner, repo, previousRun.id),
           pollIntervalSeconds,
           continueAfterSeconds
         ).wait(0);

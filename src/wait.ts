@@ -1,29 +1,20 @@
 import { info } from "@actions/core";
-import { GitHub } from "./github";
+import { GitHub, Run } from "./github";
 
 export interface Wait {
   wait(secondsSoFar: number): Promise<void>;
 }
 
 export class Waiter implements Wait {
-  private readonly github: GitHub;
-  private readonly owner: string;
-  private readonly repo: string;
-  private readonly run_id: number;
+  private readonly getRun: () => Promise<Run>;
   private readonly pollIntervalSeconds: number;
   private readonly continueAfterSeconds: number | undefined;
   constructor(
-    github: GitHub,
-    owner: string,
-    repo: string,
-    run_id: number,
+    getRun: () => Promise<Run>,
     pollIntervalSeconds: number,
     continueAfterSeconds: number | undefined
   ) {
-    this.github = github;
-    this.owner = owner;
-    this.repo = repo;
-    this.run_id = run_id;
+    this.getRun = getRun;
     this.pollIntervalSeconds = pollIntervalSeconds;
     this.continueAfterSeconds = continueAfterSeconds;
   }
@@ -36,7 +27,7 @@ export class Waiter implements Wait {
       info(`🤙Exceeded wait seconds. Continuing...`);
       return;
     }
-    const run = await this.github.run(this.owner, this.repo, this.run_id);
+    const run = await this.getRun();
     if (run.status === "completed") {
       info(`👍 Run ${run.html_url} complete.`);
       return;
