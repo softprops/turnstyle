@@ -1,5 +1,5 @@
 # https://help.github.com/en/articles/metadata-syntax-for-github-actions
-name: 'turnstyle'
+name: 'action turnstyle'
 description: 'A GitHub Action for serializing workflow runs'
 author: 'softprops'
 env:
