@@ -89,7 +89,7 @@ jobs:
       - name: Turnstyle
         uses: softprops/turnstyle@master
         with:
-+         continue-after-minutes: 5 
++         continue-after-seconds: 180 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
