@@ -13,14 +13,14 @@ async function waitForIt(
   continueAfterSeconds: number | undefined
 ) {
   if (continueAfterSeconds && secondsSoFar >= continueAfterSeconds) {
-    info(`Exceeded wait seconds. Continuing`);
+    info(`🤙Exceeded wait seconds. Continuing...`);
   }
   const run = await github.run(owner, repo, run_id);
   if (run.status === "completed") {
-    info(`Run ${run.html_url} complete.`);
+    info(`👍 Run ${run.html_url} complete.`);
     return;
   }
-  info(`awaiting run ${run.html_url}...`);
+  info(`✋Awaiting run ${run.html_url}...`);
   await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
   return waitForIt(
     github,
