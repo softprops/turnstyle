@@ -1,6 +1,6 @@
-<div align="center" size="2em">
+<h2 align="center">
   🎟️
-</div>
+</h2>
 
 <h1 align="center">
   turnstyle
@@ -115,4 +115,8 @@ The following are *required* as `step.env` keys
 |----------------|--------------------------------------|
 | `GITHUB_TOKEN` | GITHUB_TOKEN as provided by `secrets`|
 
-Doug Tangren (softprops) 2020.
+## cost of coordination
+
+At this time there is no way to coodinate and workflow runs beyond waiting. For those using private repositories you are charged based on the time your workflow spends running. Waiting within one workflow run for another to complete will encur the cost of the time spent waiting.
+
+Doug Tangren (softprops) 2020
