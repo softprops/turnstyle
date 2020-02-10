@@ -115,6 +115,6 @@ The following are *required* as `step.env` keys
 
 ## cost of coordination
 
-At this time there is no way to coodinate and workflow runs beyond waiting. For those using private repositories you are charged based on the time your workflow spends running. Waiting within one workflow run for another to complete will encur the cost of the time spent waiting.
+At this time there is no way to coodinate between workflow runs beyond waiting. For those using private repositories [you are charged based on the time your workflow spends running](https://github.com/features/actions#pricing-details). Waiting within one workflow run for another to complete will incur the cost of the time spent waiting.
 
 Doug Tangren (softprops) 2020
