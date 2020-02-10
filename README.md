@@ -24,7 +24,7 @@ This can be problematic for workflows used as part of a continuous deployment pr
 
 ## 🤸 Usage
 
-The typical setup for turnstyle involves adding job step using `softprops/turnstyle@master`.
+The typical setup for turnstyle involves adding job step using `softprops/turnstyle@v1`.
 
 ```diff
 name: Main
@@ -38,7 +38,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 +     - name: Turnstyle
-+       uses: softprops/turnstyle@master
++       uses: softprops/turnstyle@v1
 +       env:
 +         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
@@ -64,7 +64,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Turnstyle
-        uses: softprops/turnstyle@master
+        uses: softprops/turnstyle@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
@@ -85,7 +85,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Turnstyle
-        uses: softprops/turnstyle@master
+        uses: softprops/turnstyle@v1
         with:
 +         continue-after-seconds: 180 
         env:
