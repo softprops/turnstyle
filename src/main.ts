@@ -1,37 +1,8 @@
 import { setFailed, info } from "@actions/core";
 import { env } from "process";
 import { parseInput } from "./input";
-import { GitHub, OctokitGitHub, Run } from "./github";
-
-async function waitForIt(
-  github: GitHub,
-  owner: string,
-  repo: string,
-  run_id: number,
-  secondsSoFar: number,
-  pollIntervalSeconds: number,
-  continueAfterSeconds: number | undefined
-) {
-  if (continueAfterSeconds && secondsSoFar >= continueAfterSeconds) {
-    info(`🤙Exceeded wait seconds. Continuing...`);
-  }
-  const run = await github.run(owner, repo, run_id);
-  if (run.status === "completed") {
-    info(`👍 Run ${run.html_url} complete.`);
-    return;
-  }
-  info(`✋Awaiting run ${run.html_url}...`);
-  await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
-  return waitForIt(
-    github,
-    owner,
-    repo,
-    run_id,
-    secondsSoFar + pollIntervalSeconds,
-    pollIntervalSeconds,
-    continueAfterSeconds
-  );
-}
+import { OctokitGitHub } from "./github";
+import { Waiter } from "./wait";
 
 async function run() {
   try {
@@ -56,15 +27,14 @@ async function run() {
         .filter(run => run.id < runId)
         .sort((a, b) => a.id - b.id)[0];
       if (previousRun) {
-        await waitForIt(
+        await new Waiter(
           github,
           owner,
           repo,
           previousRun.id,
-          0,
           pollIntervalSeconds,
           continueAfterSeconds
-        );
+        ).wait(0);
       }
     }
   } catch (error) {
