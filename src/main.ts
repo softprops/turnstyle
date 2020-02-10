@@ -30,7 +30,8 @@ async function run() {
         await new Waiter(
           () => github.run(owner, repo, previousRun.id),
           pollIntervalSeconds,
-          continueAfterSeconds
+          continueAfterSeconds,
+          info
         ).wait();
       }
     }

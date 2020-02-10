@@ -1,22 +1,24 @@
-import { info } from "@actions/core";
 import { GitHub, Run } from "./github";
 
 export interface Wait {
-  wait(secondsSoFar?: number): Promise<void>;
+  wait(secondsSoFar?: number): Promise<number>;
 }
 
 export class Waiter implements Wait {
+  private readonly info: (msg: string) => void;
   private readonly getRun: () => Promise<Run>;
   private readonly pollIntervalSeconds: number;
   private readonly continueAfterSeconds: number | undefined;
   constructor(
     getRun: () => Promise<Run>,
     pollIntervalSeconds: number,
-    continueAfterSeconds: number | undefined
+    continueAfterSeconds: number | undefined,
+    info: (msg: string) => void
   ) {
     this.getRun = getRun;
     this.pollIntervalSeconds = pollIntervalSeconds;
     this.continueAfterSeconds = continueAfterSeconds;
+    this.info = info;
   }
 
   wait = async (secondsSoFar?: number) => {
@@ -24,15 +26,15 @@ export class Waiter implements Wait {
       this.continueAfterSeconds &&
       (secondsSoFar || 0) >= this.continueAfterSeconds
     ) {
-      info(`🤙Exceeded wait seconds. Continuing...`);
-      return;
+      this.info(`🤙Exceeded wait seconds. Continuing...`);
+      return secondsSoFar || 0;
     }
     const run = await this.getRun();
     if (run.status === "completed") {
-      info(`👍 Run ${run.html_url} complete.`);
-      return;
+      this.info(`👍 Run ${run.html_url} complete.`);
+      return secondsSoFar || 0;
     }
-    info(`✋Awaiting run ${run.html_url}...`);
+    this.info(`✋Awaiting run ${run.html_url}...`);
     await new Promise(resolve =>
       setTimeout(resolve, this.pollIntervalSeconds * 1000)
     );
