@@ -8,8 +8,10 @@ runs:
   using: 'node12'
   main: 'dist/index.js'
 inputs:
-  base:
-    description: "Base branch to compare with (defaults to master)"
+  poll-interval-seconds:
+    description: "Number of seconds to wait in between checks for previous run completion (defaults to 60)"
+  continue-after-seconds:
+    description: "Maximum number of seconds to wait before moving forward (unbound by default)"
 branding:
   color: 'green'
-  icon: 'activity'
+  icon: 'git-commit'
