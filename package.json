@@ -39,8 +39,7 @@
   },
   "lint-staged": {
     "{__tests__,src}/**/*.ts": [
-      "npm run fmt",
-      "git add"
+      "npm run fmt"
     ]
   },
   "husky": {
