@@ -11,8 +11,8 @@ describe("input", () => {
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1",
-          INPUT_CONTINUE_AFTER_SECONDS: "10",
-          INPUT_POLL_INTERVAL_SECONDS: "5"
+          "INPUT_CONTINUE-AFTER-SECONDS": "10",
+          "INPUT_POLL-INTERVAL-SECONDS": "5"
         }),
         {
           githubToken: "s3cr3t",

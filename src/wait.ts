@@ -1,4 +1,4 @@
-import { GitHub, Run } from "./github";
+import { Run } from "./github";
 
 export interface Wait {
   wait(secondsSoFar?: number): Promise<number>;
