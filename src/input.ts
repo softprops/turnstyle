@@ -15,11 +15,11 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
   const workflowName = env.GITHUB_WORKFLOW || "";
   const branch = env.GITHUB_REF?.substring(11) || "master";
   const runId = parseInt(env.GITHUB_RUN_ID || "0", 10);
-  const pollIntervalSeconds = env.INPUT_POLL_INTERVAL_SECONDS
-    ? parseInt(env.INPUT_POLL_INTERVAL_SECONDS, 10)
+  const pollIntervalSeconds = env["INPUT_POLL-INTERVAL-SECONDS"]
+    ? parseInt(env["INPUT_POLL-INTERVAL-SECONDS"], 10)
     : 60;
-  const continueAfterSeconds = env.INPUT_CONTINUE_AFTER_SECONDS
-    ? parseInt(env.INPUT_CONTINUE_AFTER_SECONDS, 10)
+  const continueAfterSeconds = env["INPUT_CONTINUE-AFTER-SECONDS"]
+    ? parseInt(env["INPUT_CONTINUE-AFTER-SECONDS"], 10)
     : undefined;
   return {
     githubToken,
