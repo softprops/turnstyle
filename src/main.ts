@@ -6,34 +6,14 @@ import { Waiter } from "./wait";
 
 async function run() {
   try {
-    const {
-      githubToken,
-      owner,
-      repo,
-      branch,
-      workflowName,
-      runId,
-      continueAfterSeconds,
-      pollIntervalSeconds
-    } = parseInput(env);
-    const github = new OctokitGitHub(githubToken);
-    const workflows = await github.workflows(owner, repo);
+    const input = parseInput(env);
+    const github = new OctokitGitHub(input.githubToken);
+    const workflows = await github.workflows(input.owner, input.repo);
     const workflow_id = workflows.find(
-      workflow => workflow.name == workflowName
+      workflow => workflow.name == input.workflowName
     )?.id;
     if (workflow_id) {
-      const runs = await github.runs(owner, repo, branch, workflow_id);
-      const previousRun = runs
-        .filter(run => run.id < runId)
-        .sort((a, b) => a.id - b.id)[0];
-      if (previousRun) {
-        await new Waiter(
-          () => github.run(owner, repo, previousRun.id),
-          pollIntervalSeconds,
-          continueAfterSeconds,
-          info
-        ).wait();
-      }
+      await new Waiter(workflow_id, github, input, info).wait();
     }
   } catch (error) {
     setFailed(error.message);
