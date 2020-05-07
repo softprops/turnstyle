@@ -20,7 +20,6 @@ export interface GitHub {
     branch: string,
     workflow_id: number
   ) => Promise<Array<Run>>;
-  run: (owner: string, repo: string, run_id: number) => Promise<Run>;
 }
 
 export class OctokitGitHub implements GitHub {
@@ -72,13 +71,4 @@ export class OctokitGitHub implements GitHub {
         status: "in_progress"
       })
     );
-
-  run = async (owner: string, repo: string, run_id: number) => {
-    const response = await this.octokit.actions.getWorkflowRun({
-      owner,
-      repo,
-      run_id
-    });
-    return response.data;
-  };
 }

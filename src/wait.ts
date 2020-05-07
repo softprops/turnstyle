@@ -1,4 +1,5 @@
-import { Run } from "./github";
+import { Run, OctokitGitHub, GitHub } from "./github";
+import { Input, parseInput } from "./input";
 
 export interface Wait {
   wait(secondsSoFar?: number): Promise<number>;
@@ -6,38 +7,49 @@ export interface Wait {
 
 export class Waiter implements Wait {
   private readonly info: (msg: string) => void;
-  private readonly getRun: () => Promise<Run>;
-  private readonly pollIntervalSeconds: number;
-  private readonly continueAfterSeconds: number | undefined;
+  private input: Input;
+  private githubClient: GitHub;
+  private workflowId: any;
+
   constructor(
-    getRun: () => Promise<Run>,
-    pollIntervalSeconds: number,
-    continueAfterSeconds: number | undefined,
+    workflowId: any,
+    githubClient: GitHub,
+    input: Input,
     info: (msg: string) => void
   ) {
-    this.getRun = getRun;
-    this.pollIntervalSeconds = pollIntervalSeconds;
-    this.continueAfterSeconds = continueAfterSeconds;
+    this.workflowId = workflowId;
+    this.input = input;
+    this.githubClient = githubClient;
     this.info = info;
   }
 
   wait = async (secondsSoFar?: number) => {
     if (
-      this.continueAfterSeconds &&
-      (secondsSoFar || 0) >= this.continueAfterSeconds
+      this.input.continueAfterSeconds &&
+      (secondsSoFar || 0) >= this.input.continueAfterSeconds
     ) {
       this.info(`🤙Exceeded wait seconds. Continuing...`);
       return secondsSoFar || 0;
     }
-    const run = await this.getRun();
-    if (run.status === "completed") {
-      this.info(`👍 Run ${run.html_url} complete.`);
-      return secondsSoFar || 0;
-    }
-    this.info(`✋Awaiting run ${run.html_url}...`);
-    await new Promise(resolve =>
-      setTimeout(resolve, this.pollIntervalSeconds * 1000)
+
+    const runs = await this.githubClient.runs(
+      this.input.owner,
+      this.input.repo,
+      this.input.branch,
+      this.workflowId
     );
-    return this.wait((secondsSoFar || 0) + this.pollIntervalSeconds);
+    const previousRuns = runs
+      .filter(run => run.id < this.input.runId)
+      .sort((a, b) => b.id - a.id);
+    if (!previousRuns || !previousRuns.length) {
+      return;
+    }
+
+    const previousRun = previousRuns[0];
+    this.info(`✋Awaiting run ${previousRun.html_url}...`);
+    await new Promise(resolve =>
+      setTimeout(resolve, this.input.pollIntervalSeconds * 1000)
+    );
+    return this.wait((secondsSoFar || 0) + this.input.pollIntervalSeconds);
   };
 }
