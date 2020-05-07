@@ -24,16 +24,6 @@ export class Waiter implements Wait {
   }
 
   wait = async (secondsSoFar?: number) => {
-    const runs = await this.githubClient.runs(
-      this.input.owner,
-      this.input.repo,
-      this.input.branch,
-      this.workflowId
-    );
-    const previousRun = runs
-      .filter(run => run.id < this.input.runId)
-      .sort((a, b) => b.id - a.id)[0];
-
     if (
       this.input.continueAfterSeconds &&
       (secondsSoFar || 0) >= this.input.continueAfterSeconds
@@ -42,17 +32,21 @@ export class Waiter implements Wait {
       return secondsSoFar || 0;
     }
 
-    const run = await this.githubClient.run(
+    const runs = await this.githubClient.runs(
       this.input.owner,
       this.input.repo,
-      previousRun.id
+      this.input.branch,
+      this.workflowId
     );
-    if (run.status === "completed") {
-      this.info(`👍 Run ${run.html_url} complete.`);
-      return secondsSoFar || 0;
+    const previousRuns = runs
+      .filter(run => run.id < this.input.runId)
+      .sort((a, b) => b.id - a.id);
+    if (!previousRuns || !previousRuns.length) {
+      return;
     }
 
-    this.info(`✋Awaiting run ${run.html_url}...`);
+    const previousRun = previousRuns[0];
+    this.info(`✋Awaiting run ${previousRun.html_url}...`);
     await new Promise(resolve =>
       setTimeout(resolve, this.input.pollIntervalSeconds * 1000)
     );

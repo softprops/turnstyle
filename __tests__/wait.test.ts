@@ -16,7 +16,7 @@ describe("wait", () => {
       beforeEach(() => {
         input = {
           branch: "master",
-          continueAfterSeconds: 1,
+          continueAfterSeconds: undefined,
           pollIntervalSeconds: 1,
           githubToken: "fake-token",
           owner: "org",
@@ -27,6 +27,7 @@ describe("wait", () => {
       });
 
       it("will continue after a prescribed number of seconds", async () => {
+        input.continueAfterSeconds = 1;
         const inProgressRun = {
           id: 1,
           status: "in_progress",
@@ -39,8 +40,6 @@ describe("wait", () => {
             branch: string,
             workflowId: number
           ) => Promise.resolve([inProgressRun]),
-          run: async (owner: string, repo: string, runId: number) =>
-            Promise.resolve(inProgressRun),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow])
         };
@@ -62,20 +61,18 @@ describe("wait", () => {
       });
 
       it("will return when a run is completed", async () => {
-        const completedRun: Run = {
+        const run: Run = {
           id: 1,
-          status: "completed",
-          html_url: ""
+          status: "in_progress",
+          html_url: "1"
         };
+
+        const mockedRunsFunc = jest
+          .fn()
+          .mockReturnValueOnce(Promise.resolve([run]))
+          .mockReturnValue(Promise.resolve([]));
         const githubClient = {
-          runs: async (
-            owner: string,
-            repo: string,
-            branch: string,
-            workflowId: number
-          ) => Promise.resolve([completedRun]),
-          run: async (owner: string, repo: string, runId: number) =>
-            Promise.resolve(completedRun),
+          runs: mockedRunsFunc,
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow])
         };
@@ -89,14 +86,11 @@ describe("wait", () => {
             messages.push(message);
           }
         );
-        assert.equal(await waiter.wait(), 0);
-        assert.deepEqual(messages, ["👍 Run  complete."]);
+        await waiter.wait();
+        assert.deepEqual(messages, ["✋Awaiting run 1..."]);
       });
 
       it("will wait for all previous runs", async () => {
-        // Set continueAfterSeconds to `undefined` to simulate waiting
-        // for all runs to complete before proceeding.
-        input.continueAfterSeconds = undefined;
         const inProgressRuns = [
           {
             id: 1,
@@ -116,52 +110,27 @@ describe("wait", () => {
         ];
         // Give the current run an id that makes it the last in the queue.
         input.runId = inProgressRuns.length + 1;
+        // Add an in-progress run to simulate a run getting queued _after_ the one we
+        // are interested in.
+        inProgressRuns.push({
+          id: input.runId + 1,
+          status: "in_progress",
+          html_url: input.runId + 1 + ""
+        });
+
         const mockedRunsFunc = jest.fn();
         mockedRunsFunc
           .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(0)))
           .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(0, 2)))
-          .mockReturnValue(Promise.resolve(inProgressRuns));
-
-        /**
-         * Simulate waiting for a previous run for 3s and then completing
-         * the previous run.
-         *
-         * Setup the "run" function to return the run information as-is,
-         * which means the previous run will appear as "in-progress" until
-         * we mutate the "status" ourselves.
-         */
-        const mockedRunFunc = jest
-          .fn()
-          .mockImplementationOnce(
-            async (owner: string, repo: string, runId: number) => {
-              const r = inProgressRuns.find(v => v.id === runId);
-              return Promise.resolve(r!);
-            }
-          )
-          .mockImplementationOnce(
-            async (owner: string, repo: string, runId: number) => {
-              const r = inProgressRuns.find(v => v.id === runId);
-              return Promise.resolve(r!);
-            }
-          )
-          .mockImplementationOnce(
-            async (owner: string, repo: string, runId: number) => {
-              const r = inProgressRuns.find(v => v.id === runId);
-              return Promise.resolve(r!);
-            }
-          )
-          .mockImplementation(
-            async (owner: string, repo: string, runId: number) => {
-              const r = inProgressRuns.find(v => v.id === runId);
-              // Modify the run status to completed to simulate a run completing.
-              r!.status = "completed";
-              return Promise.resolve(r!);
-            }
+          .mockReturnValueOnce(Promise.resolve(inProgressRuns))
+          // Finally return just the run that was queued _after_ the "input" run.
+          .mockReturnValue(
+            Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1))
           );
 
         const githubClient = {
           runs: mockedRunsFunc,
-          run: mockedRunFunc,
+          run: jest.fn(),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow])
         };
@@ -181,7 +150,7 @@ describe("wait", () => {
         const latestPreviousRun = inProgressRuns[inProgressRuns.length - 1];
         assert.deepEqual(
           messages[messages.length - 1],
-          `👍 Run ${latestPreviousRun.html_url} complete.`
+          `✋Awaiting run ${input.runId - 1}...`
         );
       });
     });
