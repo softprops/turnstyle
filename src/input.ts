@@ -7,6 +7,7 @@ export interface Input {
   runId: number;
   pollIntervalSeconds: number;
   continueAfterSeconds: number | undefined;
+  sameBranchOnly: boolean;
 }
 
 export const parseInput = (env: Record<string, string | undefined>): Input => {
@@ -21,6 +22,9 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
   const continueAfterSeconds = env["INPUT_CONTINUE-AFTER-SECONDS"]
     ? parseInt(env["INPUT_CONTINUE-AFTER-SECONDS"], 10)
     : undefined;
+  const sameBranchOnly =
+    env["INPUT_SAME-BRANCH-ONLY"] === "true" ||
+    env["INPUT_SAME-BRANCH-ONLY"] === undefined; // true if not specified
   return {
     githubToken,
     owner,
@@ -29,6 +33,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     workflowName,
     runId,
     pollIntervalSeconds,
-    continueAfterSeconds
+    continueAfterSeconds,
+    sameBranchOnly
   };
 };

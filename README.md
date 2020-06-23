@@ -71,7 +71,7 @@ jobs:
         run: sleep 30
 ```
 
-You can also limit how long a you're willing to wait before moving on with `jobs.<job_id>.steps.with.continue-after-seconds`
+You can also limit how long you're willing to wait before moving on with `jobs.<job_id>.steps.with.continue-after-seconds`
 
 ```diff
 name: Main
@@ -100,6 +100,7 @@ jobs:
 |-------------|---------|-----------------------------------------------------------------|
 | `continue-after-seconds`   | number  | Maximum number of seconds to wait before moving forward (unbound by default)                          |
 | `poll-interval-seconds`      | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                |
+| `same-branch-only`      | boolean  | Only wait on other runs from the same branch (defaults to true)                |
 
 #### outputs
 

@@ -12,6 +12,8 @@ inputs:
     description: "Number of seconds to wait in between checks for previous run completion (defaults to 60)"
   continue-after-seconds:
     description: "Maximum number of seconds to wait before moving forward (unbound by default)"
+  same-branch-only:
+    description: "Only wait on other runs from the same branch (defaults to true)"
 branding:
   color: 'green'
   icon: 'git-commit'

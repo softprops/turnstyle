@@ -17,7 +17,7 @@ export interface GitHub {
   runs: (
     owner: string,
     repo: string,
-    branch: string,
+    branch: string | undefined,
     workflow_id: number
   ) => Promise<Array<Run>>;
 }
