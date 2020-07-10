@@ -70,7 +70,8 @@ describe("input", () => {
           workflowName: "test",
           runId: 1,
           continueAfterSeconds: undefined,
-          pollIntervalSeconds: 60
+          pollIntervalSeconds: 60,
+          sameBranchOnly: true
         }
       );
     });
