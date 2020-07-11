@@ -12,7 +12,8 @@ describe("input", () => {
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
-          "INPUT_POLL-INTERVAL-SECONDS": "5"
+          "INPUT_POLL-INTERVAL-SECONDS": "5",
+          "INPUT_SAME-BRANCH-ONLY": "false"
         }),
         {
           githubToken: "s3cr3t",
@@ -22,7 +23,8 @@ describe("input", () => {
           workflowName: "test",
           runId: 1,
           continueAfterSeconds: 10,
-          pollIntervalSeconds: 5
+          pollIntervalSeconds: 5,
+          sameBranchOnly: false
         }
       );
     });
@@ -44,7 +46,8 @@ describe("input", () => {
           workflowName: "test",
           runId: 1,
           continueAfterSeconds: undefined,
-          pollIntervalSeconds: 60
+          pollIntervalSeconds: 60,
+          sameBranchOnly: true
         }
       );
     });
@@ -67,7 +70,8 @@ describe("input", () => {
           workflowName: "test",
           runId: 1,
           continueAfterSeconds: undefined,
-          pollIntervalSeconds: 60
+          pollIntervalSeconds: 60,
+          sameBranchOnly: true
         }
       );
     });

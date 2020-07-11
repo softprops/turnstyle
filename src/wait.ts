@@ -35,7 +35,7 @@ export class Waiter implements Wait {
     const runs = await this.githubClient.runs(
       this.input.owner,
       this.input.repo,
-      this.input.branch,
+      this.input.sameBranchOnly ? this.input.branch : undefined,
       this.workflowId
     );
     const previousRuns = runs

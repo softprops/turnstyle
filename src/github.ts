@@ -17,7 +17,7 @@ export interface GitHub {
   runs: (
     owner: string,
     repo: string,
-    branch: string,
+    branch: string | undefined,
     workflow_id: number
   ) => Promise<Array<Run>>;
 }
@@ -61,14 +61,20 @@ export class OctokitGitHub implements GitHub {
     repo: string,
     branch: string | undefined,
     workflow_id: number
-  ) =>
-    this.octokit.paginate(
-      this.octokit.actions.listWorkflowRuns.endpoint.merge({
-        owner,
-        repo,
-        branch,
-        workflow_id,
-        status: "in_progress"
-      })
+  ) => {
+    const options: Octokit.EndpointOptions = {
+      owner,
+      repo,
+      workflow_id,
+      status: "in_progress"
+    };
+
+    if (branch) {
+      options.branch = branch;
+    }
+
+    return this.octokit.paginate(
+      this.octokit.actions.listWorkflowRuns.endpoint.merge(options)
     );
+  };
 }

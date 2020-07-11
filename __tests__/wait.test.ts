@@ -22,7 +22,8 @@ describe("wait", () => {
           owner: "org",
           repo: "repo",
           runId: 2,
-          workflowName: workflow.name
+          workflowName: workflow.name,
+          sameBranchOnly: true
         };
       });
 
@@ -37,7 +38,7 @@ describe("wait", () => {
           runs: async (
             owner: string,
             repo: string,
-            branch: string,
+            branch: string | undefined,
             workflowId: number
           ) => Promise.resolve([inProgressRun]),
           workflows: async (owner: string, repo: string) =>
