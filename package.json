@@ -1,6 +1,6 @@
 {
   "name": "turnstyle",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "GitHub Action for limiting one workflow to complete at a time",
   "main": "lib/main.js",
