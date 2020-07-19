@@ -14,6 +14,8 @@ inputs:
     description: "Maximum number of seconds to wait before moving forward (unbound by default)"
   same-branch-only:
     description: "Only wait on other runs from the same branch (defaults to true)"
+  wait-for-job:
+    description: "Wait for a specific job within the workflow to be complete, instead of the entire workflow"
 branding:
   color: 'green'
   icon: 'git-commit'

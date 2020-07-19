@@ -2,7 +2,7 @@ import * as assert from "assert";
 
 import { Waiter } from "../src/wait";
 import { Input } from "../src/input";
-import { Workflow, Run } from "../src/github";
+import { Workflow, Run, Job } from "../src/github";
 
 describe("wait", () => {
   describe("Waiter", () => {
@@ -23,7 +23,8 @@ describe("wait", () => {
           repo: "repo",
           runId: 2,
           workflowName: workflow.name,
-          sameBranchOnly: true
+          sameBranchOnly: true,
+          waitForJob: undefined
         };
       });
 
@@ -42,7 +43,8 @@ describe("wait", () => {
             workflowId: number
           ) => Promise.resolve([inProgressRun]),
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
+          jobs: jest.fn()
         };
 
         const messages: Array<string> = [];
@@ -75,7 +77,8 @@ describe("wait", () => {
         const githubClient = {
           runs: mockedRunsFunc,
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
+          jobs: jest.fn()
         };
 
         const messages: Array<string> = [];
@@ -133,7 +136,8 @@ describe("wait", () => {
           runs: mockedRunsFunc,
           run: jest.fn(),
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
+          jobs: jest.fn()
         };
 
         const messages: Array<string> = [];
@@ -153,6 +157,106 @@ describe("wait", () => {
           messages[messages.length - 1],
           `✋Awaiting run ${input.runId - 1}...`
         );
+      });
+
+      it("will return when a wait-for-job is completed", async () => {
+        const run: Run = {
+          id: 1,
+          status: "in_progress",
+          html_url: "1"
+        };
+
+        const job1: Omit<Job, "status"> = {
+          id: 1,
+          html_url: "j1",
+          name: "job-1"
+        };
+        const job2: Omit<Job, "status"> = {
+          id: 2,
+          html_url: "j2",
+          name: "job-2"
+        };
+        const withStatus = (job: Omit<Job, "status">, status: string): Job => ({
+          ...job,
+          status
+        });
+
+        const mockedRunsFunc = jest
+          .fn()
+          .mockReturnValue(Promise.resolve([run]));
+        const mockedJobsFunc = jest
+          .fn()
+          .mockResolvedValueOnce([
+            withStatus(job1, "in_progress"),
+            withStatus(job2, "queued")
+          ])
+          .mockResolvedValueOnce([
+            withStatus(job1, "completed"),
+            withStatus(job2, "in_progress")
+          ]);
+        const githubClient = {
+          runs: mockedRunsFunc,
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow]),
+          jobs: mockedJobsFunc
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          githubClient,
+          { ...input, waitForJob: "job-1" },
+          (message: string) => {
+            messages.push(message);
+          }
+        );
+        await waiter.wait();
+        assert.deepEqual(messages, ["✋Awaiting job j1..."]);
+      });
+
+      it("will wait for entire workflow if wait-for-job is not found", async () => {
+        const run: Run = {
+          id: 1,
+          status: "in_progress",
+          html_url: "1"
+        };
+
+        const job1: Job = {
+          id: 1,
+          html_url: "j1",
+          name: "job-1",
+          status: "completed"
+        };
+        const job2: Job = {
+          id: 2,
+          html_url: "j2",
+          name: "job-2",
+          status: "completed"
+        };
+
+        const mockedRunsFunc = jest
+          .fn()
+          .mockResolvedValueOnce([run])
+          .mockResolvedValueOnce([]);
+        const mockedJobsFunc = jest.fn().mockResolvedValue([job1, job2]);
+        const githubClient = {
+          runs: mockedRunsFunc,
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow]),
+          jobs: mockedJobsFunc
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          githubClient,
+          { ...input, waitForJob: "job-not-exists" },
+          (message: string) => {
+            messages.push(message);
+          }
+        );
+        await waiter.wait();
+        assert.deepEqual(messages, ["✋Awaiting run 1..."]);
       });
     });
   });

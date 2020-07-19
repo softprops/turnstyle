@@ -27,8 +27,19 @@ jobs:
       - name: Turnstyle
         uses: ./ # Uses an action in the root directory
         with:
-          poll-interval-seconds: 10
+          poll-interval-seconds: 5
+          wait-for-job: integration
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log time
+        run: date
       - name: Deploy
-        run: sleep 180
+        run: sleep 30
+  post:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log time
+        run: date
+      - name: Does not block integration
+        run: sleep 30

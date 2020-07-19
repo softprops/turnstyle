@@ -8,6 +8,7 @@ export interface Input {
   pollIntervalSeconds: number;
   continueAfterSeconds: number | undefined;
   sameBranchOnly: boolean;
+  waitForJob: string | undefined;
 }
 
 export const parseInput = (env: Record<string, string | undefined>): Input => {
@@ -26,6 +27,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
   const sameBranchOnly =
     env["INPUT_SAME-BRANCH-ONLY"] === "true" ||
     env["INPUT_SAME-BRANCH-ONLY"] === undefined; // true if not specified
+  const waitForJob = env["INPUT_WAIT-FOR-JOB"];
   return {
     githubToken,
     owner,
@@ -35,6 +37,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     runId,
     pollIntervalSeconds,
     continueAfterSeconds,
-    sameBranchOnly
+    sameBranchOnly,
+    waitForJob
   };
 };

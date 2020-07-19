@@ -1,5 +1,5 @@
-import { Run, OctokitGitHub, GitHub } from "./github";
-import { Input, parseInput } from "./input";
+import { GitHub, Job } from "./github";
+import { Input } from "./input";
 
 export interface Wait {
   wait(secondsSoFar?: number): Promise<number>;
@@ -46,7 +46,23 @@ export class Waiter implements Wait {
     }
 
     const previousRun = previousRuns[0];
-    this.info(`✋Awaiting run ${previousRun.html_url}...`);
+    let previousJob: Job | undefined;
+
+    if (this.input.waitForJob) {
+      const jobs = await this.githubClient.jobs(
+        this.input.owner,
+        this.input.repo,
+        previousRun.id
+      );
+      previousJob = jobs.find(j => j.name === this.input.waitForJob);
+      if (previousJob?.status === "completed") return;
+    }
+
+    this.info(
+      previousJob
+        ? `✋Awaiting job ${previousJob.html_url}...`
+        : `✋Awaiting run ${previousRun.html_url}...`
+    );
     await new Promise(resolve =>
       setTimeout(resolve, this.input.pollIntervalSeconds * 1000)
     );

@@ -13,7 +13,8 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
           "INPUT_POLL-INTERVAL-SECONDS": "5",
-          "INPUT_SAME-BRANCH-ONLY": "false"
+          "INPUT_SAME-BRANCH-ONLY": "false",
+          "INPUT_WAIT-FOR-JOB": "my-job"
         }),
         {
           githubToken: "s3cr3t",
@@ -24,7 +25,8 @@ describe("input", () => {
           runId: 1,
           continueAfterSeconds: 10,
           pollIntervalSeconds: 5,
-          sameBranchOnly: false
+          sameBranchOnly: false,
+          waitForJob: "my-job"
         }
       );
     });
@@ -47,7 +49,8 @@ describe("input", () => {
           runId: 1,
           continueAfterSeconds: undefined,
           pollIntervalSeconds: 60,
-          sameBranchOnly: true
+          sameBranchOnly: true,
+          waitForJob: undefined
         }
       );
     });
@@ -71,7 +74,8 @@ describe("input", () => {
           runId: 1,
           continueAfterSeconds: undefined,
           pollIntervalSeconds: 60,
-          sameBranchOnly: true
+          sameBranchOnly: true,
+          waitForJob: undefined
         }
       );
     });

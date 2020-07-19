@@ -12,6 +12,13 @@ export interface Run {
   html_url: string;
 }
 
+export interface Job {
+  id: number;
+  status: string;
+  name: string;
+  html_url: string;
+}
+
 export interface GitHub {
   workflows: (owner: string, repo: string) => Promise<Array<Workflow>>;
   runs: (
@@ -20,6 +27,7 @@ export interface GitHub {
     branch: string | undefined,
     workflow_id: number
   ) => Promise<Array<Run>>;
+  jobs: (owner: string, repo: string, run_id: number) => Promise<Array<Job>>;
 }
 
 export class OctokitGitHub implements GitHub {
@@ -77,4 +85,17 @@ export class OctokitGitHub implements GitHub {
       this.octokit.actions.listWorkflowRuns.endpoint.merge(options)
     );
   };
+
+  jobs = async (
+    owner: string,
+    repo: string,
+    run_id: number
+  ): Promise<Octokit.ActionsListJobsForWorkflowRunResponseJobsItem[]> =>
+    this.octokit.paginate(
+      this.octokit.actions.listJobsForWorkflowRun.endpoint.merge({
+        owner,
+        repo,
+        run_id
+      })
+    );
 }
