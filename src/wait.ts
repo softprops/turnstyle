@@ -46,7 +46,7 @@ export class Waiter implements Wait {
     }
 
     const previousRun = previousRuns[0];
-    this.info(`✋Awaiting run ${previousRun.html_url}...`);
+    this.info(`✋Awaiting run ${previousRun.html_url} ...`);
     await new Promise(resolve =>
       setTimeout(resolve, this.input.pollIntervalSeconds * 1000)
     );
