@@ -56,7 +56,7 @@ describe("wait", () => {
         );
         assert.equal(await waiter.wait(), 1);
         assert.deepEqual(messages, [
-          "✋Awaiting run ...",
+          "✋Awaiting run  ...",
           "🤙Exceeded wait seconds. Continuing..."
         ]);
       });
@@ -88,7 +88,7 @@ describe("wait", () => {
           }
         );
         await waiter.wait();
-        assert.deepEqual(messages, ["✋Awaiting run 1..."]);
+        assert.deepEqual(messages, ["✋Awaiting run 1 ..."]);
       });
 
       it("will wait for all previous runs", async () => {
@@ -151,7 +151,7 @@ describe("wait", () => {
         const latestPreviousRun = inProgressRuns[inProgressRuns.length - 1];
         assert.deepEqual(
           messages[messages.length - 1],
-          `✋Awaiting run ${input.runId - 1}...`
+          `✋Awaiting run ${input.runId - 1} ...`
         );
       });
     });
