@@ -17,6 +17,7 @@ describe("wait", () => {
         input = {
           branch: "master",
           continueAfterSeconds: undefined,
+          abortAfterSeconds: undefined,
           pollIntervalSeconds: 1,
           githubToken: "fake-token",
           owner: "org",
@@ -58,6 +59,43 @@ describe("wait", () => {
         assert.deepEqual(messages, [
           "✋Awaiting run  ...",
           "🤙Exceeded wait seconds. Continuing..."
+        ]);
+      });
+
+      it("will abort after a prescribed number of seconds", async () => {
+        input.abortAfterSeconds = 1;
+        const inProgressRun = {
+          id: 1,
+          status: "in_progress",
+          html_url: ""
+        };
+        const githubClient = {
+          runs: async (
+            owner: string,
+            repo: string,
+            branch: string | undefined,
+            workflowId: number
+          ) => Promise.resolve([inProgressRun]),
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow])
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          }
+        );
+        await assert.rejects(
+          waiter.wait(),
+          new Error(`Aborted after waiting 1 seconds`)
+        );
+        assert.deepEqual(messages, [
+          "✋Awaiting run  ...",
+          "🛑Exceeded wait seconds. Aborting..."
         ]);
       });
 

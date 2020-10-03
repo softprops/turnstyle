@@ -87,7 +87,31 @@ jobs:
       - name: Turnstyle
         uses: softprops/turnstyle@v1
         with:
-+         continue-after-seconds: 180 
++         continue-after-seconds: 180
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy
+        run: sleep 30
+```
+
+or before aborting the step with `jobs.<job_id>.steps.with.abort-after-seconds`
+
+
+```diff
+name: Main
+
+on: push
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Turnstyle
+        uses: softprops/turnstyle@v1
+        with:
++         abort-after-seconds: 180
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
@@ -96,11 +120,12 @@ jobs:
 
 #### inputs
 
-| Name        | Type    | Description                                                     |
-|-------------|---------|-----------------------------------------------------------------|
-| `continue-after-seconds`   | number  | Maximum number of seconds to wait before moving forward (unbound by default)                          |
-| `poll-interval-seconds`      | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                |
-| `same-branch-only`      | boolean  | Only wait on other runs from the same branch (defaults to true)                |
+| Name                    | Type    | Description                                                                                                                    |
+|-------------------------|---------|--------------------------------------------------------------------------------------------------------------------------------|
+| `continue-after-seconds`| number  | Maximum number of seconds to wait before moving forward (unbound by default). Mutually exclusive with abort-after-seconds      |
+| `abort-after-seconds`   | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds |
+| `poll-interval-seconds` | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                       |
+| `same-branch-only`      | boolean | Only wait on other runs from the same branch (defaults to true)                                                                |
 
 #### outputs
 
