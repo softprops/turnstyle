@@ -33,8 +33,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     );
   }
   const sameBranchOnly =
-    env["INPUT_SAME-BRANCH-ONLY"] === "true" ||
-    env["INPUT_SAME-BRANCH-ONLY"] === undefined; // true if not specified
+    env["INPUT_SAME-BRANCH-ONLY"] === "true" || !env["INPUT_SAME-BRANCH-ONLY"]; // true if not specified
   return {
     githubToken,
     owner,
