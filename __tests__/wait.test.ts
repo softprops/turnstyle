@@ -89,10 +89,10 @@ describe("wait", () => {
             messages.push(message);
           }
         );
-        await assert.rejects(
-          waiter.wait(),
-          { name: "Error", message: "Aborted after waiting 1 seconds" }
-        );
+        await assert.rejects(waiter.wait(), {
+          name: "Error",
+          message: "Aborted after waiting 1 seconds"
+        });
         assert.deepEqual(messages, [
           "✋Awaiting run  ...",
           "🛑Exceeded wait seconds. Aborting..."
