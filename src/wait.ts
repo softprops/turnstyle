@@ -32,6 +32,14 @@ export class Waiter implements Wait {
       return secondsSoFar || 0;
     }
 
+    if (
+      this.input.abortAfterSeconds &&
+      (secondsSoFar || 0) >= this.input.abortAfterSeconds
+    ) {
+      this.info(`🛑Exceeded wait seconds. Aborting...`);
+      throw new Error(`Aborted after waiting ${secondsSoFar} seconds`);
+    }
+
     const runs = await this.githubClient.runs(
       this.input.owner,
       this.input.repo,

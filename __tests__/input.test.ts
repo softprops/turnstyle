@@ -23,9 +23,51 @@ describe("input", () => {
           workflowName: "test",
           runId: 1,
           continueAfterSeconds: 10,
+          abortAfterSeconds: undefined,
           pollIntervalSeconds: 5,
           sameBranchOnly: false
         }
+      );
+    });
+
+    it("parses config from env with abortAfterSeconds", () => {
+      assert.deepEqual(
+        parseInput({
+          GITHUB_TOKEN: "s3cr3t",
+          GITHUB_REF: "refs/heads/foo",
+          GITHUB_REPOSITORY: "softprops/turnstyle",
+          GITHUB_WORKFLOW: "test",
+          GITHUB_RUN_ID: "1",
+          "INPUT_ABORT-AFTER-SECONDS": "10",
+          "INPUT_POLL-INTERVAL-SECONDS": "5",
+          "INPUT_SAME-BRANCH-ONLY": "false"
+        }),
+        {
+          githubToken: "s3cr3t",
+          owner: "softprops",
+          repo: "turnstyle",
+          branch: "foo",
+          workflowName: "test",
+          runId: 1,
+          continueAfterSeconds: undefined,
+          abortAfterSeconds: 10,
+          pollIntervalSeconds: 5,
+          sameBranchOnly: false
+        }
+      );
+    });
+
+    it("rejects env with continueAfterSeconds and abortAfterSeconds", () => {
+      assert.throws(() =>
+        parseInput({
+          GITHUB_TOKEN: "s3cr3t",
+          GITHUB_REF: "refs/heads/foo",
+          GITHUB_REPOSITORY: "softprops/turnstyle",
+          GITHUB_WORKFLOW: "test",
+          GITHUB_RUN_ID: "1",
+          "INPUT_CONTINUE-AFTER-SECONDS": "10",
+          "INPUT_ABORT-AFTER-SECONDS": "2"
+        })
       );
     });
 
@@ -46,6 +88,7 @@ describe("input", () => {
           workflowName: "test",
           runId: 1,
           continueAfterSeconds: undefined,
+          abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
           sameBranchOnly: true
         }
@@ -70,6 +113,7 @@ describe("input", () => {
           workflowName: "test",
           runId: 1,
           continueAfterSeconds: undefined,
+          abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
           sameBranchOnly: true
         }
