@@ -78,7 +78,10 @@ describe("input", () => {
           GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
-          GITHUB_RUN_ID: "1"
+          GITHUB_RUN_ID: "1",
+          "INPUT_CONTINUE-AFTER-SECONDS": "",
+          "INPUT_POLL-INTERVAL-SECONDS": "",
+          "INPUT_SAME-BRANCH-ONLY": ""
         }),
         {
           githubToken: "s3cr3t",
