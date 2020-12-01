@@ -24,24 +24,32 @@ describe("wait", () => {
           repo: "repo",
           runId: 2,
           workflowName: workflow.name,
-          sameBranchOnly: true
+          sameBranchOnly: true,
+          abortOnNewerRun: false
         };
       });
 
       it("will continue after a prescribed number of seconds", async () => {
         input.continueAfterSeconds = 1;
-        const inProgressRun = {
-          id: 1,
-          status: "in_progress",
-          html_url: ""
-        };
+        const inProgressRuns = [
+          {
+            id: 1,
+            status: "in_progress",
+            html_url: ""
+          },
+          {
+            id: 2,
+            status: "in_progress",
+            html_url: ""
+          }
+        ];
         const githubClient = {
           runs: async (
             owner: string,
             repo: string,
             branch: string | undefined,
             workflowId: number
-          ) => Promise.resolve([inProgressRun]),
+          ) => Promise.resolve(inProgressRuns),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow])
         };
@@ -64,18 +72,25 @@ describe("wait", () => {
 
       it("will abort after a prescribed number of seconds", async () => {
         input.abortAfterSeconds = 1;
-        const inProgressRun = {
-          id: 1,
-          status: "in_progress",
-          html_url: ""
-        };
+        const inProgressRuns = [
+          {
+            id: 1,
+            status: "in_progress",
+            html_url: ""
+          },
+          {
+            id: 2,
+            status: "in_progress",
+            html_url: ""
+          }
+        ];
         const githubClient = {
           runs: async (
             owner: string,
             repo: string,
             branch: string | undefined,
             workflowId: number
-          ) => Promise.resolve([inProgressRun]),
+          ) => Promise.resolve(inProgressRuns),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow])
         };
@@ -100,16 +115,21 @@ describe("wait", () => {
       });
 
       it("will return when a run is completed", async () => {
-        const run: Run = {
+        const run1: Run = {
           id: 1,
           status: "in_progress",
           html_url: "1"
         };
+        const run2: Run = {
+          id: 2,
+          status: "in_progress",
+          html_url: ""
+        };
 
         const mockedRunsFunc = jest
           .fn()
-          .mockReturnValueOnce(Promise.resolve([run]))
-          .mockReturnValue(Promise.resolve([]));
+          .mockReturnValueOnce(Promise.resolve([run1, run2]))
+          .mockReturnValue(Promise.resolve([run2]));
         const githubClient = {
           runs: mockedRunsFunc,
           workflows: async (owner: string, repo: string) =>
@@ -145,27 +165,26 @@ describe("wait", () => {
             id: 3,
             status: "in_progress",
             html_url: "3"
+          },
+          {
+            id: 4,
+            status: "in_progress",
+            html_url: "4"
+          },
+          {
+            id: 5,
+            status: "in_progress",
+            html_url: "5"
           }
         ];
-        // Give the current run an id that makes it the last in the queue.
-        input.runId = inProgressRuns.length + 1;
-        // Add an in-progress run to simulate a run getting queued _after_ the one we
-        // are interested in.
-        inProgressRuns.push({
-          id: input.runId + 1,
-          status: "in_progress",
-          html_url: input.runId + 1 + ""
-        });
+        input.runId = 4;
 
         const mockedRunsFunc = jest.fn();
         mockedRunsFunc
           .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(0)))
-          .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(0, 2)))
-          .mockReturnValueOnce(Promise.resolve(inProgressRuns))
-          // Finally return just the run that was queued _after_ the "input" run.
-          .mockReturnValue(
-            Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1))
-          );
+          .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(1)))
+          .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(2)))
+          .mockReturnValue(Promise.resolve(inProgressRuns.slice(3)));
 
         const githubClient = {
           runs: mockedRunsFunc,
@@ -186,10 +205,102 @@ describe("wait", () => {
         await waiter.wait();
         // Verify that the last message printed is that the latest previous run
         // is complete and not the oldest one.
-        const latestPreviousRun = inProgressRuns[inProgressRuns.length - 1];
-        assert.deepEqual(
-          messages[messages.length - 1],
-          `✋Awaiting run ${input.runId - 1} ...`
+        assert.deepEqual(messages[messages.length - 1], `✋Awaiting run 3 ...`);
+      });
+
+      it("will abort if newer run is available", async () => {
+        const previousRun = {
+          id: 1,
+          status: "in_progress",
+          html_url: "url_1"
+        };
+        const currentRun = {
+          id: 2,
+          status: "in_progress",
+          html_url: "url_2"
+        };
+        const newerRun = {
+          id: 3,
+          status: "in_progress",
+          html_url: "url_3"
+        };
+        input.runId = currentRun.id;
+        input.abortOnNewerRun = true;
+
+        const mockedRunsFunc = jest.fn();
+        mockedRunsFunc
+          .mockResolvedValueOnce([previousRun, currentRun])
+          .mockResolvedValue([previousRun, currentRun, newerRun]);
+
+        const githubClient = {
+          runs: mockedRunsFunc,
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow])
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          }
+        );
+        await expect(waiter.wait()).rejects.toThrow(
+          "Aborted because newer run url_3 was detected."
+        );
+        expect(messages).toEqual([
+          "✋Awaiting run url_1 ...",
+          "🛑Newer run url_3 detected. Aborting..."
+        ]);
+      });
+
+      it("will continue if newer run is available but no previous run", async () => {
+        const previousRun = {
+          id: 1,
+          status: "in_progress",
+          html_url: "url_1"
+        };
+        const currentRun = {
+          id: 2,
+          status: "in_progress",
+          html_url: "url_2"
+        };
+        const newerRun = {
+          id: 3,
+          status: "in_progress",
+          html_url: "url_3"
+        };
+        input.runId = currentRun.id;
+        input.abortOnNewerRun = true;
+
+        const mockedRunsFunc = jest.fn();
+        mockedRunsFunc
+          .mockResolvedValueOnce([previousRun, currentRun])
+          .mockResolvedValue([currentRun, newerRun]);
+
+        const githubClient = {
+          runs: mockedRunsFunc,
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow])
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          }
+        );
+
+        await waiter.wait();
+        // Verify that the last message printed is that the latest previous run
+        // is complete and not the oldest one.
+        expect(messages[messages.length - 1]).toEqual(
+          "✋Awaiting run url_1 ..."
         );
       });
     });

@@ -1,5 +1,5 @@
-import { Run, OctokitGitHub, GitHub } from "./github";
-import { Input, parseInput } from "./input";
+import { GitHub } from "./github";
+import { Input } from "./input";
 
 export interface Wait {
   wait(secondsSoFar?: number): Promise<number>;
@@ -46,14 +46,25 @@ export class Waiter implements Wait {
       this.input.sameBranchOnly ? this.input.branch : undefined,
       this.workflowId
     );
-    const previousRuns = runs
-      .filter(run => run.id < this.input.runId)
-      .sort((a, b) => b.id - a.id);
-    if (!previousRuns || !previousRuns.length) {
+
+    const sortedRuns = runs.sort((a, b) => b.id - a.id);
+    const currentRunIndex = sortedRuns.findIndex(
+      ({ id }) => id === this.input.runId
+    );
+
+    const previousRun = sortedRuns[currentRunIndex + 1];
+    if (!previousRun) {
       return;
     }
 
-    const previousRun = previousRuns[0];
+    if (this.input.abortOnNewerRun && currentRunIndex > 0) {
+      const newerRun = sortedRuns[currentRunIndex - 1];
+      this.info(`🛑Newer run ${newerRun.html_url} detected. Aborting...`);
+      throw new Error(
+        `Aborted because newer run ${newerRun.html_url} was detected.`
+      );
+    }
+
     this.info(`✋Awaiting run ${previousRun.html_url} ...`);
     await new Promise(resolve =>
       setTimeout(resolve, this.input.pollIntervalSeconds * 1000)

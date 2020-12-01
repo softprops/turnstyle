@@ -13,7 +13,8 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
           "INPUT_POLL-INTERVAL-SECONDS": "5",
-          "INPUT_SAME-BRANCH-ONLY": "false"
+          "INPUT_SAME-BRANCH-ONLY": "false",
+          "INPUT_ABORT-ON-NEWER-RUN": "true"
         }),
         {
           githubToken: "s3cr3t",
@@ -25,7 +26,8 @@ describe("input", () => {
           continueAfterSeconds: 10,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 5,
-          sameBranchOnly: false
+          sameBranchOnly: false,
+          abortOnNewerRun: true
         }
       );
     });
@@ -40,7 +42,8 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_ABORT-AFTER-SECONDS": "10",
           "INPUT_POLL-INTERVAL-SECONDS": "5",
-          "INPUT_SAME-BRANCH-ONLY": "false"
+          "INPUT_SAME-BRANCH-ONLY": "false",
+          "INPUT_ABORT-ON-NEWER-RUN": "true"
         }),
         {
           githubToken: "s3cr3t",
@@ -52,7 +55,8 @@ describe("input", () => {
           continueAfterSeconds: undefined,
           abortAfterSeconds: 10,
           pollIntervalSeconds: 5,
-          sameBranchOnly: false
+          sameBranchOnly: false,
+          abortOnNewerRun: true
         }
       );
     });
@@ -81,7 +85,8 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "",
           "INPUT_POLL-INTERVAL-SECONDS": "",
-          "INPUT_SAME-BRANCH-ONLY": ""
+          "INPUT_SAME-BRANCH-ONLY": "",
+          INPUT_ABORT_IF_NEWER: ""
         }),
         {
           githubToken: "s3cr3t",
@@ -93,7 +98,8 @@ describe("input", () => {
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
-          sameBranchOnly: true
+          sameBranchOnly: true,
+          abortOnNewerRun: false
         }
       );
     });
@@ -118,7 +124,8 @@ describe("input", () => {
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
-          sameBranchOnly: true
+          sameBranchOnly: true,
+          abortOnNewerRun: false
         }
       );
     });
