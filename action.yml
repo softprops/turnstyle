@@ -16,6 +16,8 @@ inputs:
     description: "Maximum number of seconds to wait before failing the step (unbound by default). Mutually exclusive with continue-after-seconds"
   same-branch-only:
     description: "Only wait on other runs from the same branch (defaults to true)"
+  initial-wait-seconds:
+    description: "Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first poll (0 by default, ie doesn't retry)"
 outputs:
   force_continued:
     description: "True if continue-after-seconds is used and the step using turnstyle continued. False otherwise."

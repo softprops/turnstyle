@@ -154,6 +154,7 @@ jobs:
 | `abort-after-seconds`   | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds |
 | `poll-interval-seconds` | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                       |
 | `same-branch-only`      | boolean | Only wait on other runs from the same branch (defaults to true)                                                                |
+| `initial-wait-seconds`  | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt |
 
 #### outputs
 

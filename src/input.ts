@@ -9,6 +9,7 @@ export interface Input {
   continueAfterSeconds: number | undefined;
   abortAfterSeconds: number | undefined;
   sameBranchOnly: boolean;
+  initialWaitSeconds: number;
 }
 
 export const parseInput = (env: Record<string, string | undefined>): Input => {
@@ -32,6 +33,10 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
       "Only one of continue-after-seconds and abort-after-seconds may be defined"
     );
   }
+  const initialWaitSeconds = env["INPUT_INITIAL-WAIT-SECONDS"]
+    ? parseInt(env["INPUT_INITIAL-WAIT-SECONDS"], 10)
+    : 0;
+
   const sameBranchOnly =
     env["INPUT_SAME-BRANCH-ONLY"] === "true" || !env["INPUT_SAME-BRANCH-ONLY"]; // true if not specified
   return {
@@ -45,5 +50,6 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     continueAfterSeconds,
     abortAfterSeconds,
     sameBranchOnly,
+    initialWaitSeconds
   };
 };
