@@ -43,8 +43,8 @@ export class OctokitGitHub implements GitHub {
         onAbuseLimit: (retryAfter, options) => {
           // does not retry, only logs a warning
           debug(`Abuse detected for request ${options.method} ${options.url}`);
-        },
-      },
+        }
+      }
     });
   }
 
@@ -52,7 +52,7 @@ export class OctokitGitHub implements GitHub {
     this.octokit.paginate(
       this.octokit.actions.listRepoWorkflows.endpoint.merge({
         owner,
-        repo,
+        repo
       })
     );
 
@@ -65,16 +65,31 @@ export class OctokitGitHub implements GitHub {
     const options: Octokit.EndpointOptions = {
       owner,
       repo,
-      workflow_id,
-      status: "in_progress",
+      workflow_id
     };
 
     if (branch) {
       options.branch = branch;
     }
 
-    return this.octokit.paginate(
-      this.octokit.actions.listWorkflowRuns.endpoint.merge(options)
+    const in_progress_options = {
+      ...options,
+      status: "in_progress"
+    };
+    const queued_options = {
+      ...options,
+      status: "queued"
+    };
+
+    const in_progress_runs = this.octokit.paginate(
+      this.octokit.actions.listWorkflowRuns.endpoint.merge(in_progress_options)
+    );
+    const queued_runs = this.octokit.paginate(
+      this.octokit.actions.listWorkflowRuns.endpoint.merge(queued_options)
+    );
+
+    return Promise.all([in_progress_runs, queued_runs]).then(runs =>
+      [].concat.apply<never[], any, Array<Run>>([], runs)
     );
   };
 }

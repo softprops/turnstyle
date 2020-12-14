@@ -194,6 +194,65 @@ describe("wait", () => {
         );
       });
 
+      it("will wait for both in_progress and queued runs", async () => {
+        const existingRuns = [
+          {
+            id: 1,
+            status: "in_progress",
+            html_url: "1"
+          },
+          {
+            id: 2,
+            status: "queued",
+            html_url: "2"
+          }
+        ];
+        // Give the current run an id that makes it the last in the queue.
+        input.runId = existingRuns.length + 1;
+        // Add an in-progress run to simulate a run getting queued _after_ the one we
+        // are interested in.
+        existingRuns.push({
+          id: input.runId + 1,
+          status: "queued",
+          html_url: input.runId + 1 + ""
+        });
+
+        const mockedRunsFunc = jest.fn();
+        mockedRunsFunc
+          .mockReturnValueOnce(Promise.resolve(existingRuns.slice(0)))
+          .mockReturnValueOnce(Promise.resolve(existingRuns.slice(0, 1)))
+          .mockReturnValueOnce(Promise.resolve(existingRuns))
+          // Finally return just the run that was queued _after_ the "input" run.
+          .mockReturnValue(
+            Promise.resolve(existingRuns.slice(existingRuns.length - 1))
+          );
+
+        const githubClient = {
+          runs: mockedRunsFunc,
+          run: jest.fn(),
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow])
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          }
+        );
+        await waiter.wait();
+        // Verify that the last message printed is that the latest previous run
+        // is complete and not the oldest one.
+        const latestPreviousRun = existingRuns[existingRuns.length - 1];
+        assert.deepEqual(
+          messages[messages.length - 1],
+          `✋Awaiting run ${input.runId - 1} ...`
+        );
+      });
+
       it("will retry to get previous runs, if not found during first try", async () => {
         jest.setTimeout(10 * 1000);
         input.initialWaitSeconds = 2;
