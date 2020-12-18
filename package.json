@@ -21,21 +21,21 @@
   "author": "softprops",
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^1.2.2",
-    "@octokit/rest": "^16.43.1",
-    "@octokit/plugin-throttling": "^3.2.0"
+    "@actions/core": "^1.2.6",
+    "@octokit/plugin-throttling": "^3.3.4",
+    "@octokit/rest": "^16.43.2"
   },
   "devDependencies": {
-    "@types/jest": "^25.1.2",
-    "@types/node": "^13.7.0",
+    "@types/jest": "^25.2.3",
+    "@types/node": "^13.13.36",
     "@zeit/ncc": "^0.21.0",
-    "husky": "^4.2.1",
+    "husky": "^4.3.6",
     "jest": "^25.1.0",
     "jest-circus": "^25.1.0",
-    "lint-staged": "^10.0.7",
+    "lint-staged": "^10.5.3",
     "prettier": "1.19.1",
-    "ts-jest": "^25.2.0",
-    "typescript": "^3.7.5"
+    "ts-jest": "^25.5.1",
+    "typescript": "^3.9.7"
   },
   "lint-staged": {
     "{__tests__,src}/**/*.ts": [
