@@ -1,3 +1,7 @@
+## unreleased
+
+* Added feature to set the environment variable `CI_SKIP=true` when using `continue-after-seconds` so that only a subset of future steps can be skipped.
+
 ## 0.1.4
 
 * Introduce `abort-after-seconds` input. This behaves much the way  `continue-after-seconds` does but aborts from the workflow step rather than pushing onward. [#19](https://github.com/softprops/turnstyle/pull/19)
