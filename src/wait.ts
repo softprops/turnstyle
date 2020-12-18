@@ -1,5 +1,6 @@
 import { Run, OctokitGitHub, GitHub } from "./github";
 import { Input, parseInput } from "./input";
+import { exportVariable } from "@actions/core";
 
 export interface Wait {
   wait(secondsSoFar?: number): Promise<number>;
@@ -29,6 +30,7 @@ export class Waiter implements Wait {
       (secondsSoFar || 0) >= this.input.continueAfterSeconds
     ) {
       this.info(`🤙Exceeded wait seconds. Continuing...`);
+      exportVariable("CI_SKIP", "true");
       return secondsSoFar || 0;
     }
 

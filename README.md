@@ -118,6 +118,32 @@ jobs:
         run: sleep 30
 ```
 
+Finally, you can use the `CI_SKIP` environment variable to skip only a subset of steps
+by setting `continue-after-seconds` and conditioning future setps with `if: ! env.CI_SKIP`
+
+
+```
+name: Main
+
+on: push
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Turnstyle
+        uses: softprops/turnstyle@v1
+        with:
++         continue-after-seconds: 180
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy
++       if: ! env.CI_SKIP
+        run: sleep 30
+```
+
 #### inputs
 
 | Name                    | Type    | Description                                                                                                                    |
