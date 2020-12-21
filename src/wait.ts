@@ -1,6 +1,6 @@
 import { Run, OctokitGitHub, GitHub } from "./github";
 import { Input, parseInput } from "./input";
-import { exportVariable } from "@actions/core";
+import { setOutput } from "@actions/core";
 
 export interface Wait {
   wait(secondsSoFar?: number): Promise<number>;
@@ -30,7 +30,7 @@ export class Waiter implements Wait {
       (secondsSoFar || 0) >= this.input.continueAfterSeconds
     ) {
       this.info(`🤙Exceeded wait seconds. Continuing...`);
-      exportVariable("CI_SKIP", "true");
+      setOutput("force_continued", "true");
       return secondsSoFar || 0;
     }
 
@@ -39,6 +39,7 @@ export class Waiter implements Wait {
       (secondsSoFar || 0) >= this.input.abortAfterSeconds
     ) {
       this.info(`🛑Exceeded wait seconds. Aborting...`);
+      setOutput("force_continued", "false");
       throw new Error(`Aborted after waiting ${secondsSoFar} seconds`);
     }
 
@@ -52,6 +53,7 @@ export class Waiter implements Wait {
       .filter(run => run.id < this.input.runId)
       .sort((a, b) => b.id - a.id);
     if (!previousRuns || !previousRuns.length) {
+      setOutput("force_continued", "false");
       return;
     }
 

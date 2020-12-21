@@ -118,8 +118,9 @@ jobs:
         run: sleep 30
 ```
 
-Finally, you can use the `CI_SKIP` environment variable to skip only a subset of steps
-by setting `continue-after-seconds` and conditioning future setps with `if: ! env.CI_SKIP`
+Finally, you can use the `force_continued` output to skip only a subset of steps
+by setting `continue-after-seconds` and conditioning future steps with
+`if: ! steps.<step id>.force_continued`
 
 
 ```
@@ -134,13 +135,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Turnstyle
+        id: turnstyle
         uses: softprops/turnstyle@v1
         with:
 +         continue-after-seconds: 180
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
-+       if: ! env.CI_SKIP
++       if: ! steps.turnstyle.force_continued
         run: sleep 30
 ```
 
@@ -155,7 +157,9 @@ jobs:
 
 #### outputs
 
-None.
+| Name                    | Type     | Description                                                                                     |
+|-------------------------|----------|-------------------------------------------------------------------------------------------------|
+| `force_continued`       | boolean  | True if continue-after-seconds is used and the step using turnstyle continued. False otherwise. |
 
 #### environment variables
 
