@@ -1,6 +1,6 @@
 ## unreleased
 
-* Added feature to set the environment variable `CI_SKIP=true` when using `continue-after-seconds` so that only a subset of future steps can be skipped.
+* Added feature to set the output `force_continued=true` when using `continue-after-seconds` so that only a subset of future steps can be skipped.
 
 ## 0.1.4
 
