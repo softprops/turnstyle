@@ -120,10 +120,10 @@ jobs:
 
 Finally, you can use the `force_continued` output to skip only a subset of steps
 by setting `continue-after-seconds` and conditioning future steps with
-`if: ! steps.<step id>.force_continued`
+`if: ! steps.<step id>.outputs.force_continued`
 
 
-```
+```diff
 name: Main
 
 on: push
@@ -142,7 +142,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
-+       if: ! steps.turnstyle.force_continued
++       if: ! steps.turnstyle.outputs.force_continued
         run: sleep 30
 ```
 
