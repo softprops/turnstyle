@@ -118,6 +118,34 @@ jobs:
         run: sleep 30
 ```
 
+Finally, you can use the `force_continued` output to skip only a subset of steps
+by setting `continue-after-seconds` and conditioning future steps with
+`if: ! steps.<step id>.force_continued`
+
+
+```
+name: Main
+
+on: push
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Turnstyle
+        id: turnstyle
+        uses: softprops/turnstyle@v1
+        with:
++         continue-after-seconds: 180
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy
++       if: ! steps.turnstyle.force_continued
+        run: sleep 30
+```
+
 #### inputs
 
 | Name                    | Type    | Description                                                                                                                    |
@@ -129,7 +157,9 @@ jobs:
 
 #### outputs
 
-None.
+| Name                    | Type     | Description                                                                                     |
+|-------------------------|----------|-------------------------------------------------------------------------------------------------|
+| `force_continued`       | boolean  | True if continue-after-seconds is used and the step using turnstyle continued. False otherwise. |
 
 #### environment variables
 
