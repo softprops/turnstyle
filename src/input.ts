@@ -44,6 +44,6 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     pollIntervalSeconds,
     continueAfterSeconds,
     abortAfterSeconds,
-    sameBranchOnly
+    sameBranchOnly,
   };
 };

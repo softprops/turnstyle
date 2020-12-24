@@ -43,8 +43,8 @@ export class OctokitGitHub implements GitHub {
         onAbuseLimit: (retryAfter, options) => {
           // does not retry, only logs a warning
           debug(`Abuse detected for request ${options.method} ${options.url}`);
-        }
-      }
+        },
+      },
     });
   }
 
@@ -52,7 +52,7 @@ export class OctokitGitHub implements GitHub {
     this.octokit.paginate(
       this.octokit.actions.listRepoWorkflows.endpoint.merge({
         owner,
-        repo
+        repo,
       })
     );
 
@@ -66,7 +66,7 @@ export class OctokitGitHub implements GitHub {
       owner,
       repo,
       workflow_id,
-      status: "in_progress"
+      status: "in_progress",
     };
 
     if (branch) {

@@ -13,7 +13,7 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
           "INPUT_POLL-INTERVAL-SECONDS": "5",
-          "INPUT_SAME-BRANCH-ONLY": "false"
+          "INPUT_SAME-BRANCH-ONLY": "false",
         }),
         {
           githubToken: "s3cr3t",
@@ -25,7 +25,7 @@ describe("input", () => {
           continueAfterSeconds: 10,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 5,
-          sameBranchOnly: false
+          sameBranchOnly: false,
         }
       );
     });
@@ -40,7 +40,7 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_ABORT-AFTER-SECONDS": "10",
           "INPUT_POLL-INTERVAL-SECONDS": "5",
-          "INPUT_SAME-BRANCH-ONLY": "false"
+          "INPUT_SAME-BRANCH-ONLY": "false",
         }),
         {
           githubToken: "s3cr3t",
@@ -52,7 +52,7 @@ describe("input", () => {
           continueAfterSeconds: undefined,
           abortAfterSeconds: 10,
           pollIntervalSeconds: 5,
-          sameBranchOnly: false
+          sameBranchOnly: false,
         }
       );
     });
@@ -66,7 +66,7 @@ describe("input", () => {
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
-          "INPUT_ABORT-AFTER-SECONDS": "2"
+          "INPUT_ABORT-AFTER-SECONDS": "2",
         })
       );
     });
@@ -81,7 +81,7 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "",
           "INPUT_POLL-INTERVAL-SECONDS": "",
-          "INPUT_SAME-BRANCH-ONLY": ""
+          "INPUT_SAME-BRANCH-ONLY": "",
         }),
         {
           githubToken: "s3cr3t",
@@ -93,7 +93,7 @@ describe("input", () => {
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
-          sameBranchOnly: true
+          sameBranchOnly: true,
         }
       );
     });
@@ -106,7 +106,7 @@ describe("input", () => {
           GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
-          GITHUB_RUN_ID: "1"
+          GITHUB_RUN_ID: "1",
         }),
         {
           githubToken: "s3cr3t",
@@ -118,7 +118,7 @@ describe("input", () => {
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
-          sameBranchOnly: true
+          sameBranchOnly: true,
         }
       );
     });
