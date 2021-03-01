@@ -12,6 +12,7 @@ async function run() {
     const workflow_id = workflows.find(
       (workflow) => workflow.name == input.workflowName
     )?.id;
+    console.log(workflow_id);
     if (workflow_id) {
       await new Waiter(workflow_id, github, input, info).wait();
     }
