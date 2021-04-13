@@ -10,7 +10,7 @@ describe("wait", () => {
       let input: Input;
       const workflow: Workflow = {
         id: 123124,
-        name: "Test workflow"
+        name: "Test workflow",
       };
 
       beforeEach(() => {
@@ -25,7 +25,7 @@ describe("wait", () => {
           runId: 2,
           workflowName: workflow.name,
           sameBranchOnly: true,
-          initialWaitSeconds: 0
+          initialWaitSeconds: 0,
         };
       });
 
@@ -34,7 +34,7 @@ describe("wait", () => {
         const inProgressRun = {
           id: 1,
           status: "in_progress",
-          html_url: ""
+          html_url: "",
         };
         const githubClient = {
           runs: async (
@@ -44,7 +44,7 @@ describe("wait", () => {
             workflowId: number
           ) => Promise.resolve([inProgressRun]),
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
         };
 
         const messages: Array<string> = [];
@@ -59,7 +59,7 @@ describe("wait", () => {
         assert.equal(await waiter.wait(), 1);
         assert.deepEqual(messages, [
           "✋Awaiting run  ...",
-          "🤙Exceeded wait seconds. Continuing..."
+          "🤙Exceeded wait seconds. Continuing...",
         ]);
       });
 
@@ -68,7 +68,7 @@ describe("wait", () => {
         const inProgressRun = {
           id: 1,
           status: "in_progress",
-          html_url: ""
+          html_url: "",
         };
         const githubClient = {
           runs: async (
@@ -78,7 +78,7 @@ describe("wait", () => {
             workflowId: number
           ) => Promise.resolve([inProgressRun]),
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
         };
 
         const messages: Array<string> = [];
@@ -92,11 +92,11 @@ describe("wait", () => {
         );
         await assert.rejects(waiter.wait(), {
           name: "Error",
-          message: "Aborted after waiting 1 seconds"
+          message: "Aborted after waiting 1 seconds",
         });
         assert.deepEqual(messages, [
           "✋Awaiting run  ...",
-          "🛑Exceeded wait seconds. Aborting..."
+          "🛑Exceeded wait seconds. Aborting...",
         ]);
       });
 
@@ -104,7 +104,7 @@ describe("wait", () => {
         const run: Run = {
           id: 1,
           status: "in_progress",
-          html_url: "1"
+          html_url: "1",
         };
 
         const mockedRunsFunc = jest
@@ -114,7 +114,7 @@ describe("wait", () => {
         const githubClient = {
           runs: mockedRunsFunc,
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
         };
 
         const messages: Array<string> = [];
@@ -135,18 +135,18 @@ describe("wait", () => {
           {
             id: 1,
             status: "in_progress",
-            html_url: "1"
+            html_url: "1",
           },
           {
             id: 2,
             status: "in_progress",
-            html_url: "2"
+            html_url: "2",
           },
           {
             id: 3,
             status: "in_progress",
-            html_url: "3"
-          }
+            html_url: "3",
+          },
         ];
         // Give the current run an id that makes it the last in the queue.
         input.runId = inProgressRuns.length + 1;
@@ -155,7 +155,7 @@ describe("wait", () => {
         inProgressRuns.push({
           id: input.runId + 1,
           status: "in_progress",
-          html_url: input.runId + 1 + ""
+          html_url: input.runId + 1 + "",
         });
 
         const mockedRunsFunc = jest.fn();
@@ -172,7 +172,7 @@ describe("wait", () => {
           runs: mockedRunsFunc,
           run: jest.fn(),
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
         };
 
         const messages: Array<string> = [];
@@ -199,13 +199,13 @@ describe("wait", () => {
           {
             id: 1,
             status: "in_progress",
-            html_url: "1"
+            html_url: "1",
           },
           {
             id: 2,
             status: "queued",
-            html_url: "2"
-          }
+            html_url: "2",
+          },
         ];
         // Give the current run an id that makes it the last in the queue.
         input.runId = existingRuns.length + 1;
@@ -214,7 +214,7 @@ describe("wait", () => {
         existingRuns.push({
           id: input.runId + 1,
           status: "queued",
-          html_url: input.runId + 1 + ""
+          html_url: input.runId + 1 + "",
         });
 
         const mockedRunsFunc = jest.fn();
@@ -231,7 +231,7 @@ describe("wait", () => {
           runs: mockedRunsFunc,
           run: jest.fn(),
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
         };
 
         const messages: Array<string> = [];
@@ -262,7 +262,7 @@ describe("wait", () => {
         const run: Run = {
           id: 1,
           status: "in_progress",
-          html_url: "1"
+          html_url: "1",
         };
 
         const mockedRunsFunc = jest
@@ -277,7 +277,7 @@ describe("wait", () => {
         const githubClient = {
           runs: mockedRunsFunc,
           workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow])
+            Promise.resolve([workflow]),
         };
 
         const messages: Array<string> = [];
@@ -292,7 +292,7 @@ describe("wait", () => {
         await waiter.wait();
         assert.deepStrictEqual(messages, [
           `🔎 Waiting for ${input.initialWaitSeconds} seconds before checking for runs again...`,
-          "✋Awaiting run 1 ..."
+          "✋Awaiting run 1 ...",
         ]);
       });
     });
