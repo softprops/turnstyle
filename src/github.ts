@@ -53,6 +53,7 @@ export class OctokitGitHub implements GitHub {
       this.octokit.actions.listRepoWorkflows.endpoint.merge({
         owner,
         repo,
+        per_page: 100,
       })
     );
 
@@ -67,6 +68,7 @@ export class OctokitGitHub implements GitHub {
       repo,
       workflow_id,
       status: "in_progress",
+      per_page: 100,
     };
 
     if (branch) {
