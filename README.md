@@ -169,6 +169,23 @@ The following are *required* as `step.env` keys
 |----------------|--------------------------------------|
 | `GITHUB_TOKEN` | GITHUB_TOKEN as provided by `secrets`|
 
+## required permissions
+
+Because this application leverages the `GITHUB_TOKEN` to make API requests, the
+permissions granted to the token must be sufficient to make the API requests.
+By default, the token has wide enough permissions to allow all API requests
+made by this action. If you are customizing your token permissions, you must
+explicitly specify all permissions, including those that you need that would
+otherwise be granted by the defaults. See ["Permissions for the
+GITHUB_TOKEN"](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token)
+In the GitHub Actions documentation.
+
+If you need to specify explicit permissions for the API requests made by this
+action, the permissions required are:
+
+- `actions:read` - this permission is required for the [listWorkflowRunsForRepo](https://octokit.github.io/rest.js/v18#actions-list-workflow-runs-for-repo)
+API request.
+
 ## cost of coordination
 
 At this time there is no way to coordinate between workflow runs beyond waiting. For those using private repositories, [you are charged based on the time your workflow spends running](https://github.com/features/actions#pricing-details). Waiting within one workflow run for another to complete will incur the cost of the time spent waiting.
