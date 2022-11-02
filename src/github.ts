@@ -2,8 +2,6 @@ import { Octokit } from "@octokit/rest";
 import { Endpoints } from "@octokit/types";
 import { debug, warning } from "@actions/core";
 
-export type GitHub = typeof OctokitGitHub;
-
 export class OctokitGitHub {
   private readonly octokit: Octokit;
   constructor(githubToken: string) {
