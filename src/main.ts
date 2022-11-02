@@ -22,7 +22,7 @@ async function run() {
       (workflow) => workflow.name == input.workflowName
     )?.id;
     if (workflow_id) {
-      await new Waiter(workflow_id, github, input, info).wait();
+      await new Waiter(workflow_id, github, input, info, debug).wait();
     } else {
       setFailed(`No workflow found matching workflow_id: ${workflow_id}`);
     }
