@@ -1,5 +1,5 @@
-import { Run, OctokitGitHub, GitHub } from "./github";
-import { Input, parseInput } from "./input";
+import { OctokitGitHub as GitHub } from "./github";
+import { Input } from "./input";
 import { setOutput } from "@actions/core";
 
 export interface Wait {
@@ -10,7 +10,7 @@ export class Waiter implements Wait {
   private readonly info: (msg: string) => void;
   private input: Input;
   private githubClient: GitHub;
-  private workflowId: any;
+  private readonly workflowId: any;
 
   constructor(
     workflowId: any,

@@ -2,13 +2,12 @@ import * as assert from "assert";
 
 import { Waiter } from "../src/wait";
 import { Input } from "../src/input";
-import { Workflow, Run } from "../src/github";
 
 describe("wait", () => {
   describe("Waiter", () => {
     describe("wait", () => {
       let input: Input;
-      const workflow: Workflow = {
+      const workflow = {
         id: 123124,
         name: "Test workflow",
       };
@@ -49,6 +48,7 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
@@ -83,6 +83,7 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
@@ -100,7 +101,7 @@ describe("wait", () => {
       });
 
       it("will return when a run is completed", async () => {
-        const run: Run = {
+        const run = {
           id: 1,
           status: "in_progress",
           html_url: "1",
@@ -119,6 +120,7 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
@@ -177,6 +179,7 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {

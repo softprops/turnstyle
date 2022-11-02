@@ -1,28 +1,10 @@
 import { Octokit } from "@octokit/rest";
+import { Endpoints } from "@octokit/types";
 import { debug, warning } from "@actions/core";
 
-export interface Workflow {
-  id: number;
-  name: string;
-}
+export type GitHub = typeof OctokitGitHub;
 
-export interface Run {
-  id: number;
-  status: string;
-  html_url: string;
-}
-
-export interface GitHub {
-  workflows: (owner: string, repo: string) => Promise<Array<Workflow>>;
-  runs: (
-    owner: string,
-    repo: string,
-    branch: string | undefined,
-    workflow_id: number
-  ) => Promise<Array<Run>>;
-}
-
-export class OctokitGitHub implements GitHub {
+export class OctokitGitHub {
   private readonly octokit: Octokit;
   constructor(githubToken: string) {
     Octokit.plugin(require("@octokit/plugin-throttling"));
@@ -49,12 +31,10 @@ export class OctokitGitHub implements GitHub {
   }
 
   workflows = async (owner: string, repo: string) =>
-    this.octokit.paginate(
-      this.octokit.actions.listRepoWorkflows.endpoint.merge({
-        owner,
-        repo,
-      })
-    );
+    this.octokit.paginate(this.octokit.actions.listRepoWorkflows, {
+      owner,
+      repo,
+    });
 
   runs = async (
     owner: string,
@@ -62,19 +42,21 @@ export class OctokitGitHub implements GitHub {
     branch: string | undefined,
     workflow_id: number
   ) => {
-    const options: Octokit.EndpointOptions = {
-      owner,
-      repo,
-      workflow_id,
-      status: "in_progress",
-    };
+    const options: Endpoints["GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs"]["parameters"] =
+      {
+        owner,
+        repo,
+        workflow_id,
+        status: "in_progress",
+      };
 
     if (branch) {
       options.branch = branch;
     }
 
     return this.octokit.paginate(
-      this.octokit.actions.listWorkflowRuns.endpoint.merge(options)
+      this.octokit.actions.listWorkflowRuns,
+      options
     );
   };
 }
