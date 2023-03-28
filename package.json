@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/softprops/diffset.git"
+    "url": "git+https://github.com/cinch-labs/turnstyle.git"
   },
   "keywords": [
     "actions",
@@ -23,20 +23,20 @@
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^1.10.0",
-    "@octokit/plugin-throttling": "^4.3.2",
-    "@octokit/rest": "^19.0.5"
+    "@octokit/plugin-throttling": "^5.0.1",
+    "@octokit/rest": "^19.0.7"
   },
   "devDependencies": {
     "@types/jest": "^29.2.1",
-    "@types/node": "^18.11.9",
-    "@vercel/ncc": "^0.34.0",
-    "husky": "^8.0.1",
-    "jest": "^29.2.2",
-    "jest-circus": "^29.2.2",
-    "lint-staged": "^13.0.3",
-    "prettier": "^2.7.1",
-    "ts-jest": "^29.0.3",
-    "typescript": "^4.8.4"
+    "@types/node": "^16.18.21",
+    "@vercel/ncc": "^0.36.1",
+    "husky": "^8.0.3",
+    "jest": "^29.5.0",
+    "jest-circus": "^29.5.0",
+    "lint-staged": "^13.2.0",
+    "prettier": "^2.8.7",
+    "ts-jest": "^29.0.5",
+    "typescript": "^5.0.2"
   },
   "lint-staged": {
     "{__tests__,src}/**/*.ts": [
