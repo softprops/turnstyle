@@ -57,6 +57,17 @@ export class Waiter implements Wait {
     this.debug(`Found ${runs.length} ${this.workflowId} runs`);
     const previousRuns = runs
       .filter((run) => run.id < this.input.runId)
+      .filter((run) => {
+        const isSuccessful: boolean = run.conclusion === "success";
+
+        if (isSuccessful) {
+          this.debug(
+            `Skipping run ${run.id}, status: ${run.status}, conclusion: ${run.conclusion}`
+          );
+        }
+
+        return !isSuccessful;
+      })
       .sort((a, b) => b.id - a.id);
     if (!previousRuns || !previousRuns.length) {
       setOutput("force_continued", "");
