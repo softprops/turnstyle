@@ -12,6 +12,7 @@ export class Waiter implements Wait {
   private input: Input;
   private githubClient: GitHub;
   private readonly workflowId: any;
+  private attempt: number;
 
   constructor(
     workflowId: any,
@@ -25,9 +26,12 @@ export class Waiter implements Wait {
     this.githubClient = githubClient;
     this.info = info;
     this.debug = debug;
+    this.attempt = 0;
   }
 
   wait = async (secondsSoFar?: number) => {
+    let pollingInterval = this.input.pollIntervalSeconds;
+
     if (
       this.input.continueAfterSeconds &&
       (secondsSoFar || 0) >= this.input.continueAfterSeconds
@@ -90,9 +94,19 @@ export class Waiter implements Wait {
 
     const previousRun = previousRuns[0];
     this.info(`✋Awaiting run ${previousRun.html_url} ...`);
-    await new Promise((resolve) =>
-      setTimeout(resolve, this.input.pollIntervalSeconds * 1000),
-    );
-    return this.wait((secondsSoFar || 0) + this.input.pollIntervalSeconds);
+
+    if (this.input.exponentialBackoffRetries) {
+      pollingInterval =
+        this.input.pollIntervalSeconds * (2 * this.attempt || 1);
+      this.info(
+        `🔁 Attempt ${
+          this.attempt + 1
+        }, next will be in ${pollingInterval} seconds`,
+      );
+      this.attempt++;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollingInterval * 1000));
+    return this.wait((secondsSoFar || 0) + pollingInterval);
   };
 }

@@ -312,6 +312,70 @@ describe("wait", () => {
           "✋Awaiting run 1 ...",
         ]);
       });
+
+      it("will wait for all previous runs with exponential backoff", async () => {
+        input.exponentialBackoffRetries = true;
+        const inProgressRuns = [
+          {
+            id: 1,
+            status: "in_progress",
+            html_url: "1",
+          },
+          {
+            id: 2,
+            status: "in_progress",
+            html_url: "2",
+          },
+          {
+            id: 3,
+            status: "queued",
+            html_url: "3",
+          },
+        ];
+        // Give the current run an id that makes it the last in the queue.
+        input.runId = inProgressRuns.length + 1;
+        // Add an in-progress run to simulate a run getting queued _after_ the one we
+        // are interested in.
+        inProgressRuns.push({
+          id: input.runId + 1,
+          status: "in_progress",
+          html_url: input.runId + 1 + "",
+        });
+
+        const mockedRunsFunc = jest
+          .fn()
+          .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(0)))
+          .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(1)))
+          .mockReturnValue(
+            Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1)),
+          );
+
+        const githubClient = {
+          runs: mockedRunsFunc,
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+        await waiter.wait();
+        assert.deepEqual(messages, [
+          `✋Awaiting run ${input.runId - 1} ...`,
+          `🔁 Attempt 1, next will be in 1 seconds`,
+          `✋Awaiting run ${input.runId - 1} ...`,
+          `🔁 Attempt 2, next will be in 2 seconds`,
+        ]);
+      });
     });
   });
 });
