@@ -25,6 +25,7 @@ describe("wait", () => {
           workflowName: workflow.name,
           sameBranchOnly: true,
           initialWaitSeconds: 0,
+          exponentialBackoffRetries: false,
         };
       });
 
