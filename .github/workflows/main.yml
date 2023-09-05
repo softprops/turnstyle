@@ -1,6 +1,6 @@
 name: Main
 
-on: 
+on:
   workflow_dispatch:
   push:
     paths-ignore:
@@ -18,9 +18,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # https://github.com/actions/checkout
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
       - name: Install
         run: npm ci
       - name: Build
@@ -29,12 +31,16 @@ jobs:
         run: npm run test
       - name: Format
         run: npm run fmtcheck
+
   integration:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
       - name: Turnstyle
         uses: ./ # Uses an action in the root directory
         with:
