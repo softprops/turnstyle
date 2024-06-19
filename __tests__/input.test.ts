@@ -71,7 +71,7 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
           "INPUT_ABORT-AFTER-SECONDS": "2",
-        })
+        }),
       );
     });
 

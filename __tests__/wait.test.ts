@@ -2,13 +2,12 @@ import * as assert from "assert";
 
 import { Waiter } from "../src/wait";
 import { Input } from "../src/input";
-import { Workflow, Run } from "../src/github";
 
 describe("wait", () => {
   describe("Waiter", () => {
     describe("wait", () => {
       let input: Input;
-      const workflow: Workflow = {
+      const workflow = {
         id: 123124,
         name: "Test workflow",
       };
@@ -41,7 +40,7 @@ describe("wait", () => {
             owner: string,
             repo: string,
             branch: string | undefined,
-            workflowId: number
+            workflowId: number,
           ) => Promise.resolve([inProgressRun]),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow]),
@@ -50,11 +49,13 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
             messages.push(message);
-          }
+          },
+          () => {},
         );
         assert.equal(await waiter.wait(), 1);
         assert.deepEqual(messages, [
@@ -75,7 +76,7 @@ describe("wait", () => {
             owner: string,
             repo: string,
             branch: string | undefined,
-            workflowId: number
+            workflowId: number,
           ) => Promise.resolve([inProgressRun]),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow]),
@@ -84,11 +85,13 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
             messages.push(message);
-          }
+          },
+          () => {},
         );
         await assert.rejects(waiter.wait(), {
           name: "Error",
@@ -101,7 +104,7 @@ describe("wait", () => {
       });
 
       it("will return when a run is completed", async () => {
-        const run: Run = {
+        const run = {
           id: 1,
           status: "in_progress",
           html_url: "1",
@@ -120,11 +123,13 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
             messages.push(message);
-          }
+          },
+          () => {},
         );
         await waiter.wait();
         assert.deepEqual(messages, ["✋Awaiting run 1 ..."]);
@@ -165,7 +170,7 @@ describe("wait", () => {
           .mockReturnValueOnce(Promise.resolve(inProgressRuns))
           // Finally return just the run that was queued _after_ the "input" run.
           .mockReturnValue(
-            Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1))
+            Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1)),
           );
 
         const githubClient = {
@@ -178,11 +183,13 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
             messages.push(message);
-          }
+          },
+          () => {},
         );
         await waiter.wait();
         // Verify that the last message printed is that the latest previous run
@@ -190,7 +197,7 @@ describe("wait", () => {
         const latestPreviousRun = inProgressRuns[inProgressRuns.length - 1];
         assert.deepEqual(
           messages[messages.length - 1],
-          `✋Awaiting run ${input.runId - 1} ...`
+          `✋Awaiting run ${input.runId - 1} ...`,
         );
       });
 

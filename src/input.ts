@@ -30,7 +30,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     : undefined;
   if (continueAfterSeconds !== undefined && abortAfterSeconds !== undefined) {
     throw new Error(
-      "Only one of continue-after-seconds and abort-after-seconds may be defined"
+      "Only one of continue-after-seconds and abort-after-seconds may be defined",
     );
   }
   const initialWaitSeconds = env["INPUT_INITIAL-WAIT-SECONDS"]
