@@ -1,3 +1,19 @@
+## 2.1.0
+
+### Exciting New Features 🎉
+
+* feature: fetch 100 results per page by @anomiex in https://github.com/softprops/turnstyle/pull/39
+* feature: wait for queued runs and an option to refresh runs from GitHub API by @vigneshmsft in https://github.com/softprops/turnstyle/pull/31
+
+### Bug fixes 🐛
+* fix: ignore inconsistent runs that have a status set to 'in_progress' but conclusion is 'success' by @gustaff-weldon in https://github.com/softprops/turnstyle/pull/50
+
+## 2.0.0
+
+* Explain required GITHUB_TOKEN permissions by @chadxzs in https://github.com/softprops/turnstyle/pull/40
+* Upgrade dependencies, add debug logs by @roryabraham in https://github.com/softprops/turnstyle/pull/46
+* feat: bump action to use node20 runtime by @chenrui333 in https://github.com/softprops/turnstyle/pull/55
+
 ## 0.1.5
 
 * Added feature to set the output `force_continued=true` when using `continue-after-seconds` so that only a subset of future steps can be skipped.
