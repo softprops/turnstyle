@@ -32,6 +32,7 @@ export class OctokitGitHub {
     this.octokit.paginate(this.octokit.actions.listRepoWorkflows, {
       owner,
       repo,
+      per_page: 100,
     });
 
   runs = async (
@@ -46,6 +47,7 @@ export class OctokitGitHub {
         repo,
         workflow_id,
         status: "in_progress",
+        per_page: 100,
       };
 
     if (branch) {
