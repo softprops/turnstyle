@@ -65,10 +65,10 @@ export class Waiter implements Wait {
         (secondsSoFar || 0) < this.input.initialWaitSeconds
       ) {
         this.info(
-          `🔎 Waiting for ${this.input.initialWaitSeconds} seconds before checking for runs again...`
+          `🔎 Waiting for ${this.input.initialWaitSeconds} seconds before checking for runs again...`,
         );
         await new Promise((resolve) =>
-          setTimeout(resolve, this.input.initialWaitSeconds * 1000)
+          setTimeout(resolve, this.input.initialWaitSeconds * 1000),
         );
         return this.wait((secondsSoFar || 0) + this.input.initialWaitSeconds);
       }

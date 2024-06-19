@@ -28,7 +28,7 @@ describe("input", () => {
           pollIntervalSeconds: 5,
           sameBranchOnly: false,
           initialWaitSeconds: 5,
-        }
+        },
       );
     });
 
@@ -57,7 +57,7 @@ describe("input", () => {
           pollIntervalSeconds: 5,
           sameBranchOnly: false,
           initialWaitSeconds: 0,
-        }
+        },
       );
     });
 
@@ -100,7 +100,7 @@ describe("input", () => {
           pollIntervalSeconds: 60,
           sameBranchOnly: true,
           initialWaitSeconds: 0,
-        }
+        },
       );
     });
 
@@ -126,7 +126,7 @@ describe("input", () => {
           pollIntervalSeconds: 60,
           sameBranchOnly: true,
           initialWaitSeconds: 0,
-        }
+        },
       );
     });
   });

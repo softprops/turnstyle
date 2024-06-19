@@ -11,7 +11,7 @@ export class OctokitGitHub {
       throttle: {
         onRateLimit: (retryAfter, options) => {
           warning(
-            `Request quota exhausted for request ${options.method} ${options.url}`
+            `Request quota exhausted for request ${options.method} ${options.url}`,
           );
 
           if (options.request.retryCount === 0) {
@@ -39,7 +39,7 @@ export class OctokitGitHub {
     owner: string,
     repo: string,
     branch: string | undefined,
-    workflow_id: number
+    workflow_id: number,
   ) => {
     const options: Endpoints["GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs"]["parameters"] =
       {
@@ -64,14 +64,14 @@ export class OctokitGitHub {
     };
 
     const in_progress_runs = this.octokit.paginate(
-      this.octokit.actions.listWorkflowRuns.endpoint.merge(in_progress_options)
+      this.octokit.actions.listWorkflowRuns.endpoint.merge(in_progress_options),
     );
     const queued_runs = this.octokit.paginate(
-      this.octokit.actions.listWorkflowRuns.endpoint.merge(queued_options)
+      this.octokit.actions.listWorkflowRuns.endpoint.merge(queued_options),
     );
 
     return Promise.all([in_progress_runs, queued_runs]).then((runs) =>
-      [].concat.apply<never[], any, Array<Run>>([], runs)
+      [].concat.apply<never[], any, Array<Run>>([], runs),
     );
   };
 }

@@ -231,7 +231,7 @@ describe("wait", () => {
           .mockReturnValueOnce(Promise.resolve(existingRuns))
           // Finally return just the run that was queued _after_ the "input" run.
           .mockReturnValue(
-            Promise.resolve(existingRuns.slice(existingRuns.length - 1))
+            Promise.resolve(existingRuns.slice(existingRuns.length - 1)),
           );
 
         const githubClient = {
@@ -244,11 +244,13 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
             messages.push(message);
-          }
+          },
+          () => {},
         );
         await waiter.wait();
         // Verify that the last message printed is that the latest previous run
@@ -256,7 +258,7 @@ describe("wait", () => {
         const latestPreviousRun = existingRuns[existingRuns.length - 1];
         assert.deepEqual(
           messages[messages.length - 1],
-          `✋Awaiting run ${input.runId - 1} ...`
+          `✋Awaiting run ${input.runId - 1} ...`,
         );
       });
 
@@ -266,7 +268,7 @@ describe("wait", () => {
         // give the current run a random id
         input.runId = 2;
 
-        const run: Run = {
+        const run = {
           id: 1,
           status: "in_progress",
           html_url: "1",
@@ -290,11 +292,13 @@ describe("wait", () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
+          // @ts-ignore
           githubClient,
           input,
           (message: string) => {
             messages.push(message);
-          }
+          },
+          () => {},
         );
         await waiter.wait();
         assert.deepStrictEqual(messages, [
