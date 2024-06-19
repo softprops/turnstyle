@@ -46,7 +46,6 @@ export class OctokitGitHub {
         owner,
         repo,
         workflow_id,
-        status: "in_progress",
         per_page: 100,
       };
 
@@ -54,9 +53,27 @@ export class OctokitGitHub {
       options.branch = branch;
     }
 
-    return this.octokit.paginate(
+    const in_progress_options = {
+      ...options,
+      status: "in_progress" as const,
+    };
+    const queued_options = {
+      ...options,
+      status: "queued" as const,
+    };
+
+    const in_progress_runs = this.octokit.paginate(
       this.octokit.actions.listWorkflowRuns,
-      options,
+      in_progress_options,
+    );
+
+    const queued_runs = this.octokit.paginate(
+      this.octokit.actions.listWorkflowRuns,
+      queued_options,
+    );
+
+    return Promise.all([in_progress_runs, queued_runs]).then((values) =>
+      values.flat(),
     );
   };
 }
