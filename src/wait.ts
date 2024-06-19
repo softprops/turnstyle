@@ -62,7 +62,7 @@ export class Waiter implements Wait {
 
         if (isSuccessful) {
           this.debug(
-            `Skipping run ${run.id}, status: ${run.status}, conclusion: ${run.conclusion}`
+            `Skipping run ${run.id}, status: ${run.status}, conclusion: ${run.conclusion}`,
           );
         }
 
