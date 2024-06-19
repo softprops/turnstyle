@@ -8,9 +8,8 @@ async function run() {
   try {
     const input = parseInput(env);
     debug(
-      `Parsed inputs (w/o token): ${(({ githubToken, ...inputs }) => inputs)(
-        input,
-      )}`,
+      `Parsed inputs (w/o token): ${(({ githubToken, ...inputs }) =>
+        JSON.stringify(inputs))(input)}`,
     );
     const github = new OctokitGitHub(input.githubToken);
     debug(`Fetching workflows for ${input.owner}/${input.repo}...`);
