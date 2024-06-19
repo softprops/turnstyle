@@ -18,7 +18,7 @@ export class Waiter implements Wait {
     githubClient: GitHub,
     input: Input,
     info: (msg: string) => void,
-    debug: (msg: string) => void
+    debug: (msg: string) => void,
   ) {
     this.workflowId = workflowId;
     this.input = input;
@@ -51,7 +51,7 @@ export class Waiter implements Wait {
       this.input.owner,
       this.input.repo,
       this.input.sameBranchOnly ? this.input.branch : undefined,
-      this.workflowId
+      this.workflowId,
     );
 
     this.debug(`Found ${runs.length} ${this.workflowId} runs`);
@@ -79,7 +79,7 @@ export class Waiter implements Wait {
     const previousRun = previousRuns[0];
     this.info(`✋Awaiting run ${previousRun.html_url} ...`);
     await new Promise((resolve) =>
-      setTimeout(resolve, this.input.pollIntervalSeconds * 1000)
+      setTimeout(resolve, this.input.pollIntervalSeconds * 1000),
     );
     return this.wait((secondsSoFar || 0) + this.input.pollIntervalSeconds);
   };

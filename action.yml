@@ -5,7 +5,7 @@ author: 'softprops'
 env:
   'GITHUB_TOKEN': 'Repository token provided by Github Actions secrets'
 runs:
-  using: 'node16'
+  using: 'node20'
   main: 'dist/index.js'
 inputs:
   poll-interval-seconds:

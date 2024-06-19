@@ -1,6 +1,6 @@
 {
   "name": "turnstyle",
-  "version": "0.1.5",
+  "version": "2.0.0",
   "private": true,
   "description": "GitHub Action for limiting one workflow to complete at a time",
   "main": "lib/main.js",
@@ -22,21 +22,21 @@
   "author": "softprops",
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^1.10.0",
-    "@octokit/plugin-throttling": "^4.3.2",
-    "@octokit/rest": "^19.0.5"
+    "@actions/core": "^1.10.1",
+    "@octokit/plugin-throttling": "^9.3.0",
+    "@octokit/rest": "^20.1.1"
   },
   "devDependencies": {
-    "@types/jest": "^29.2.1",
-    "@types/node": "^18.11.9",
-    "@vercel/ncc": "^0.34.0",
-    "husky": "^8.0.1",
-    "jest": "^29.2.2",
-    "jest-circus": "^29.2.2",
-    "lint-staged": "^13.0.3",
-    "prettier": "^2.7.1",
-    "ts-jest": "^29.0.3",
-    "typescript": "^4.8.4"
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.6",
+    "@vercel/ncc": "^0.38.1",
+    "husky": "^9.0.11",
+    "jest": "^29.7.0",
+    "jest-circus": "^29.7.0",
+    "lint-staged": "^15.2.7",
+    "prettier": "^3.3.2",
+    "ts-jest": "^29.1.5",
+    "typescript": "^5"
   },
   "lint-staged": {
     "{__tests__,src}/**/*.ts": [
