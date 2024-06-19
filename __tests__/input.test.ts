@@ -26,7 +26,7 @@ describe("input", () => {
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 5,
           sameBranchOnly: false,
-        }
+        },
       );
     });
 
@@ -53,7 +53,7 @@ describe("input", () => {
           abortAfterSeconds: 10,
           pollIntervalSeconds: 5,
           sameBranchOnly: false,
-        }
+        },
       );
     });
 
@@ -67,7 +67,7 @@ describe("input", () => {
           GITHUB_RUN_ID: "1",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
           "INPUT_ABORT-AFTER-SECONDS": "2",
-        })
+        }),
       );
     });
 
@@ -94,7 +94,7 @@ describe("input", () => {
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
           sameBranchOnly: true,
-        }
+        },
       );
     });
 
@@ -119,7 +119,7 @@ describe("input", () => {
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
           sameBranchOnly: true,
-        }
+        },
       );
     });
   });

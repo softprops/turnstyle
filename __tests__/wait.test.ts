@@ -39,7 +39,7 @@ describe("wait", () => {
             owner: string,
             repo: string,
             branch: string | undefined,
-            workflowId: number
+            workflowId: number,
           ) => Promise.resolve([inProgressRun]),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow]),
@@ -54,7 +54,7 @@ describe("wait", () => {
           (message: string) => {
             messages.push(message);
           },
-          () => {}
+          () => {},
         );
         assert.equal(await waiter.wait(), 1);
         assert.deepEqual(messages, [
@@ -75,7 +75,7 @@ describe("wait", () => {
             owner: string,
             repo: string,
             branch: string | undefined,
-            workflowId: number
+            workflowId: number,
           ) => Promise.resolve([inProgressRun]),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow]),
@@ -90,7 +90,7 @@ describe("wait", () => {
           (message: string) => {
             messages.push(message);
           },
-          () => {}
+          () => {},
         );
         await assert.rejects(waiter.wait(), {
           name: "Error",
@@ -128,7 +128,7 @@ describe("wait", () => {
           (message: string) => {
             messages.push(message);
           },
-          () => {}
+          () => {},
         );
         await waiter.wait();
         assert.deepEqual(messages, ["✋Awaiting run 1 ..."]);
@@ -169,7 +169,7 @@ describe("wait", () => {
           .mockReturnValueOnce(Promise.resolve(inProgressRuns))
           // Finally return just the run that was queued _after_ the "input" run.
           .mockReturnValue(
-            Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1))
+            Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1)),
           );
 
         const githubClient = {
@@ -188,7 +188,7 @@ describe("wait", () => {
           (message: string) => {
             messages.push(message);
           },
-          () => {}
+          () => {},
         );
         await waiter.wait();
         // Verify that the last message printed is that the latest previous run
@@ -196,7 +196,7 @@ describe("wait", () => {
         const latestPreviousRun = inProgressRuns[inProgressRuns.length - 1];
         assert.deepEqual(
           messages[messages.length - 1],
-          `✋Awaiting run ${input.runId - 1} ...`
+          `✋Awaiting run ${input.runId - 1} ...`,
         );
       });
     });
