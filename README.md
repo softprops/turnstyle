@@ -39,8 +39,6 @@ jobs:
         uses: actions/checkout@v2
 +     - name: Turnstyle
 +       uses: softprops/turnstyle@v1
-+       env:
-+         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
         run: sleep 30
 ```
@@ -65,8 +63,6 @@ jobs:
         uses: actions/checkout@v2
       - name: Turnstyle
         uses: softprops/turnstyle@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
         run: sleep 30
 ```
@@ -88,8 +84,6 @@ jobs:
         uses: softprops/turnstyle@v1
         with:
 +         continue-after-seconds: 180
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
         run: sleep 30
 ```
@@ -112,8 +106,6 @@ jobs:
         uses: softprops/turnstyle@v1
         with:
 +         abort-after-seconds: 180
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
         run: sleep 30
 ```
@@ -139,8 +131,6 @@ jobs:
         uses: softprops/turnstyle@v1
         with:
 +         continue-after-seconds: 180
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy
 +       if: ! steps.turnstyle.outputs.force_continued
         run: sleep 30
@@ -162,13 +152,6 @@ jobs:
 |-------------------------|----------|-------------------------------------------------------------------------------------------------|
 | `force_continued`       | boolean  | True if continue-after-seconds is used and the step using turnstyle continued. False otherwise. |
 
-#### environment variables
-
-The following are *required* as `step.env` keys
-
-| Name           | Description                          |
-|----------------|--------------------------------------|
-| `GITHUB_TOKEN` | GITHUB_TOKEN as provided by `secrets`|
 
 ## required permissions
 

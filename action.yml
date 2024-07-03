@@ -8,6 +8,10 @@ runs:
   using: 'node20'
   main: 'dist/index.js'
 inputs:
+  token:
+    description: 'A GitHub access token'
+    required: true
+    default: ${{ github.token }}
   poll-interval-seconds:
     description: "Number of seconds to wait in between checks for previous run completion (defaults to 60)"
   continue-after-seconds:
