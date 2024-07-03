@@ -7,6 +7,7 @@ export class OctokitGitHub {
   constructor(githubToken: string) {
     Octokit.plugin(require("@octokit/plugin-throttling"));
     this.octokit = new Octokit({
+      baseUrl: process.env["GITHUB_API_URL"] || "https://api.github.com",
       auth: githubToken,
       throttle: {
         onRateLimit: (retryAfter, options) => {
