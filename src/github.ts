@@ -62,6 +62,10 @@ export class OctokitGitHub {
       ...options,
       status: "queued" as const,
     };
+    const waiting_options = {
+      ...options,
+      status: "waiting" as const,
+    };
 
     const in_progress_runs = this.octokit.paginate(
       this.octokit.actions.listWorkflowRuns,
@@ -73,8 +77,13 @@ export class OctokitGitHub {
       queued_options,
     );
 
-    return Promise.all([in_progress_runs, queued_runs]).then((values) =>
-      values.flat(),
+    const waiting_runs = this.octokit.paginate(
+      this.octokit.actions.listWorkflowRuns,
+      waiting_options,
+    );
+
+    return Promise.all([in_progress_runs, queued_runs, waiting_runs]).then(
+      (values) => values.flat(),
     );
   };
 }
