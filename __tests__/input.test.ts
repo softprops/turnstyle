@@ -6,11 +6,11 @@ describe("input", () => {
     it("parses config from env with custom inputs", () => {
       assert.deepEqual(
         parseInput({
-          GITHUB_TOKEN: "s3cr3t",
           GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1",
+          "INPUT_TOKEN": "s3cr3t",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
           "INPUT_POLL-INTERVAL-SECONDS": "5",
           "INPUT_SAME-BRANCH-ONLY": "false",
@@ -35,11 +35,11 @@ describe("input", () => {
     it("parses config from env with abortAfterSeconds", () => {
       assert.deepEqual(
         parseInput({
-          GITHUB_TOKEN: "s3cr3t",
           GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1",
+          "INPUT_TOKEN": "s3cr3t",
           "INPUT_ABORT-AFTER-SECONDS": "10",
           "INPUT_POLL-INTERVAL-SECONDS": "5",
           "INPUT_SAME-BRANCH-ONLY": "false",
@@ -64,11 +64,11 @@ describe("input", () => {
     it("rejects env with continueAfterSeconds and abortAfterSeconds", () => {
       assert.throws(() =>
         parseInput({
-          GITHUB_TOKEN: "s3cr3t",
           GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1",
+          "INPUT_TOKEN": "s3cr3t",
           "INPUT_CONTINUE-AFTER-SECONDS": "10",
           "INPUT_ABORT-AFTER-SECONDS": "2",
         }),
@@ -78,11 +78,11 @@ describe("input", () => {
     it("parses config from env with defaults", () => {
       assert.deepEqual(
         parseInput({
-          GITHUB_TOKEN: "s3cr3t",
           GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1",
+          "INPUT_TOKEN": "s3cr3t",
           "INPUT_CONTINUE-AFTER-SECONDS": "",
           "INPUT_POLL-INTERVAL-SECONDS": "",
           "INPUT_SAME-BRANCH-ONLY": "",
@@ -107,12 +107,12 @@ describe("input", () => {
     it("favours GITHUB_HEAD_REF when present (pull requests)", () => {
       assert.deepEqual(
         parseInput({
-          GITHUB_TOKEN: "s3cr3t",
           GITHUB_HEAD_REF: "pr-branch-name",
           GITHUB_REF: "refs/heads/foo",
           GITHUB_REPOSITORY: "softprops/turnstyle",
           GITHUB_WORKFLOW: "test",
           GITHUB_RUN_ID: "1",
+          "INPUT_TOKEN": "s3cr3t",
         }),
         {
           githubToken: "s3cr3t",
