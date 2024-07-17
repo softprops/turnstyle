@@ -201,7 +201,7 @@ describe("wait", () => {
         );
       });
 
-      it("will wait for both in_progress and queued runs", async () => {
+      it("will wait for in_progress, queued, and waiting runs", async () => {
         const existingRuns = [
           {
             id: 1,
@@ -212,6 +212,11 @@ describe("wait", () => {
             id: 2,
             status: "queued",
             html_url: "2",
+          },
+          {
+            id: 3,
+            status: "waiting",
+            html_url: "3",
           },
         ];
         // Give the current run an id that makes it the last in the queue.
