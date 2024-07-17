@@ -1,28 +1,30 @@
-name: Main
+name: main
 
 on:
   workflow_dispatch:
   push:
     paths-ignore:
-      - '*.md'
+      - "*.md"
     branches:
       - main
       - master
   pull_request:
     paths-ignore:
-      - '*.md'
+      - "*.md"
     branches:
       - main
       - master
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version-file: ".tool-versions"
+          cache: "npm"
+
       - name: Install
         run: npm ci
       - name: Build
@@ -34,18 +36,19 @@ jobs:
 
   integration:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version-file: ".tool-versions"
+          cache: "npm"
+
       - name: Turnstyle
         uses: ./ # Uses an action in the root directory
         with:
           poll-interval-seconds: 10
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Deploy
         run: sleep 180
