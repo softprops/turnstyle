@@ -9,8 +9,8 @@ runs:
   main: 'dist/index.js'
 inputs:
   token:
-    description: 'A GitHub access token'
-    required: true
+    description: 'GitHub access token'
+    required: false
     default: ${{ github.token }}
   poll-interval-seconds:
     description: "Number of seconds to wait in between checks for previous run completion (defaults to 60)"
