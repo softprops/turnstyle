@@ -82,8 +82,8 @@ export class OctokitGitHub {
       waiting_options,
     );
 
-    return Promise.all([in_progress_runs, queued_runs, waiting_runs]).then((values) =>
-      values.flat(),
+    return Promise.all([in_progress_runs, queued_runs, waiting_runs]).then(
+      (values) => values.flat(),
     );
   };
 }
