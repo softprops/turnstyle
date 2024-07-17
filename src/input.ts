@@ -13,7 +13,7 @@ export interface Input {
 }
 
 export const parseInput = (env: Record<string, string | undefined>): Input => {
-  const githubToken = env.GITHUB_TOKEN || "";
+  const githubToken = env["INPUT_TOKEN"] || "";
   const [owner, repo] = (env.GITHUB_REPOSITORY || "").split("/");
   const workflowName = env.GITHUB_WORKFLOW || "";
   const branch =
