@@ -24,7 +24,7 @@ This can be problematic for workflows used as part of a continuous deployment pr
 
 ## 🤸 Usage
 
-The typical setup for turnstyle involves adding job step using `softprops/turnstyle@v1`.
+The typical setup for turnstyle involves adding job step using `softprops/turnstyle@v2`.
 
 ```diff
 name: Main
@@ -36,9 +36,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 +     - name: Turnstyle
-+       uses: softprops/turnstyle@v1
++       uses: softprops/turnstyle@v2
       - name: Deploy
         run: sleep 30
 ```
@@ -60,9 +60,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Turnstyle
-        uses: softprops/turnstyle@v1
+        uses: softprops/turnstyle@v2
       - name: Deploy
         run: sleep 30
 ```
@@ -79,9 +79,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Turnstyle
-        uses: softprops/turnstyle@v1
+        uses: softprops/turnstyle@v2
         with:
 +         continue-after-seconds: 180
       - name: Deploy
@@ -89,7 +89,6 @@ jobs:
 ```
 
 or before aborting the step with `jobs.<job_id>.steps.with.abort-after-seconds`
-
 
 ```diff
 name: Main
@@ -101,9 +100,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Turnstyle
-        uses: softprops/turnstyle@v1
+        uses: softprops/turnstyle@v2
         with:
 +         abort-after-seconds: 180
       - name: Deploy
@@ -114,7 +113,6 @@ Finally, you can use the `force_continued` output to skip only a subset of steps
 by setting `continue-after-seconds` and conditioning future steps with
 `if: ! steps.<step id>.outputs.force_continued`
 
-
 ```diff
 name: Main
 
@@ -125,10 +123,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Turnstyle
         id: turnstyle
-        uses: softprops/turnstyle@v1
+        uses: softprops/turnstyle@v2
         with:
 +         continue-after-seconds: 180
       - name: Deploy
@@ -138,20 +136,19 @@ jobs:
 
 #### inputs
 
-| Name                    | Type    | Description                                                                                                                    |
-|-------------------------|---------|--------------------------------------------------------------------------------------------------------------------------------|
-| `continue-after-seconds`| number  | Maximum number of seconds to wait before moving forward (unbound by default). Mutually exclusive with abort-after-seconds      |
-| `abort-after-seconds`   | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds |
-| `poll-interval-seconds` | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                       |
-| `same-branch-only`      | boolean | Only wait on other runs from the same branch (defaults to true)                                                                |
-| `initial-wait-seconds`  | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt |
+| Name                     | Type    | Description                                                                                                                            |
+| ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `continue-after-seconds` | number  | Maximum number of seconds to wait before moving forward (unbound by default). Mutually exclusive with abort-after-seconds              |
+| `abort-after-seconds`    | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds         |
+| `poll-interval-seconds`  | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                               |
+| `same-branch-only`       | boolean | Only wait on other runs from the same branch (defaults to true)                                                                        |
+| `initial-wait-seconds`   | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt |
 
 #### outputs
 
-| Name                    | Type     | Description                                                                                     |
-|-------------------------|----------|-------------------------------------------------------------------------------------------------|
-| `force_continued`       | boolean  | True if continue-after-seconds is used and the step using turnstyle continued. False otherwise. |
-
+| Name              | Type    | Description                                                                                     |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `force_continued` | boolean | True if continue-after-seconds is used and the step using turnstyle continued. False otherwise. |
 
 ## required permissions
 
@@ -168,7 +165,7 @@ If you need to specify explicit permissions for the API requests made by this
 action, the permissions required are:
 
 - `actions:read` - this permission is required for the [listWorkflowRunsForRepo](https://octokit.github.io/rest.js/v18#actions-list-workflow-runs-for-repo)
-API request.
+  API request.
 
 ## cost of coordination
 
