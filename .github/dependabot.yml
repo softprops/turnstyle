@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: npm
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
     ignore:
       - dependency-name: node-fetch
         versions:
@@ -13,6 +13,6 @@ updates:
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
       prefix: "chore(deps)"
