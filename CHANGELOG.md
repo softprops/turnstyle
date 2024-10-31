@@ -1,3 +1,7 @@
+## 2.2.3
+
+fix lockfile issue
+
 ## 2.2.2
 
 maintenance release with updated dependencies
