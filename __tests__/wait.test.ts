@@ -24,6 +24,8 @@ describe("wait", () => {
           runId: 2,
           workflowName: workflow.name,
           sameBranchOnly: true,
+          jobToWaitFor: undefined,
+          stepToWaitFor: undefined,
           initialWaitSeconds: 0,
         };
       });
@@ -309,6 +311,167 @@ describe("wait", () => {
         assert.deepStrictEqual(messages, [
           `🔎 Waiting for ${input.initialWaitSeconds} seconds before checking for runs again...`,
           "✋Awaiting run 1 ...",
+        ]);
+      });
+
+      it("will wait for a specific job to complete if wait-for-job is defined", async () => {
+        input.jobToWaitFor = "test-job";
+        input.pollIntervalSeconds = 1;
+        const run = {
+          id: 1,
+          status: "in_progress",
+          html_url: "1",
+        };
+        const job = {
+          id: 1,
+          name: "test-job",
+          status: "in_progress",
+          html_url: "job-url",
+        };
+
+        const githubClient = {
+          runs: async (
+            owner: string,
+            repo: string,
+            branch: string | undefined,
+            workflowId: number,
+          ) => Promise.resolve([run]),
+          jobs: jest
+            .fn()
+            .mockResolvedValueOnce([job])
+            .mockResolvedValue([{ ...job, status: "completed" }]),
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+        await waiter.wait();
+
+        assert.deepEqual(messages, [
+          "✋Awaiting job run completion from job job-url ...",
+          "Job test-job completed from run 1",
+        ]);
+      });
+
+      it("will wait for a specific step to complete if wait-for-step is defined", async () => {
+        input.jobToWaitFor = "test-job";
+        input.stepToWaitFor = "test-step";
+        input.pollIntervalSeconds = 1;
+        const run = {
+          id: 1,
+          status: "in_progress",
+          html_url: "1",
+        };
+        const job = {
+          id: 1,
+          name: "test-job",
+          status: "in_progress",
+          html_url: "job-url",
+        };
+        const step = {
+          id: 1,
+          name: "test-step",
+          status: "in_progress",
+          html_url: "step-url",
+        };
+
+        const githubClient = {
+          runs: async (
+            owner: string,
+            repo: string,
+            branch: string | undefined,
+            workflowId: number,
+          ) => Promise.resolve([run]),
+          jobs: jest.fn().mockResolvedValue([job]),
+          steps: jest
+            .fn()
+            .mockResolvedValueOnce([step])
+            .mockResolvedValue([{ ...step, status: "completed" }]),
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+        await waiter.wait();
+
+        assert.deepEqual(messages, [
+          "✋Awaiting step completion from job job-url ...",
+          "Step test-step completed from run 1",
+        ]);
+      });
+
+      it("will await the full run if the job is not found", async () => {
+        input.runId = 2;
+        input.jobToWaitFor = "test-job";
+        input.pollIntervalSeconds = 1;
+        const run = {
+          id: 1,
+          status: "in_progress",
+          html_url: "run1-url",
+        };
+        const run2 = {
+          id: 2,
+          status: "in_progress",
+          html_url: "run2-url",
+        };
+        const notOurTestJob = {
+          id: 1,
+          name: "another-job",
+          status: "in_progress",
+          html_url: "job-url",
+        };
+
+        const githubClient = {
+          // On the first call have both runs in progress, on the second call have the first run completed
+          runs: jest
+            .fn()
+            .mockResolvedValueOnce([run, run2])
+            .mockResolvedValue([
+              { ...run, conclusion: "success", status: "success" },
+              run2,
+            ]),
+          // This workflow's jobs is not the one we are looking for (should be fine, we fall back to waiting the full run)
+          jobs: jest.fn().mockResolvedValue([notOurTestJob]),
+          workflows: async (owner: string, repo: string) =>
+            Promise.resolve([workflow]),
+        };
+
+        const infoMessages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            infoMessages.push(message);
+          },
+          () => {},
+        );
+
+        await waiter.wait();
+        assert.deepEqual(infoMessages, [
+          `Job ${input.jobToWaitFor} not found in run ${run.id}, awaiting full run for safety`,
+          `✋Awaiting run ${run.html_url} ...`,
         ]);
       });
     });

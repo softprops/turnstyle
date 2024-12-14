@@ -89,7 +89,61 @@ export class Waiter implements Wait {
     }
 
     const previousRun = previousRuns[0];
+    // Handle if we are checking for a specific job / step to wait for
+    if (this.input.jobToWaitFor) {
+      this.debug(`Fetching jobs for run ${previousRun.id}`);
+      const jobs = await this.githubClient.jobs(
+        this.input.owner,
+        this.input.repo,
+        previousRun.id,
+      );
+      const job = jobs.find((job) => job.name === this.input.jobToWaitFor);
+      // Now handle if we are checking for a specific step
+      if (this.input.stepToWaitFor && job) {
+        this.debug(`Fetching steps for job ${job.id}`);
+        const steps = await this.githubClient.steps(
+          this.input.owner,
+          this.input.repo,
+          job.id,
+        );
+        const step = steps.find(
+          (step) => step.name === this.input.stepToWaitFor,
+        );
+        if (step && step.status !== "completed") {
+          this.info(`✋Awaiting step completion from job ${job.html_url} ...`);
+          return this.pollAndWait(secondsSoFar);
+        } else if (step) {
+          this.info(
+            `Step ${this.input.stepToWaitFor} completed from run ${previousRun.html_url}`,
+          );
+          return;
+        } else {
+          this.info(
+            `Step ${this.input.stepToWaitFor} not found in job ${job.id}, awaiting full run for safety`,
+          );
+        }
+      }
+
+      if (job && job.status !== "completed") {
+        this.info(`✋Awaiting job run completion from job ${job.html_url} ...`);
+        return this.pollAndWait(secondsSoFar);
+      } else if (job) {
+        this.info(
+          `Job ${this.input.jobToWaitFor} completed from run ${previousRun.html_url}`,
+        );
+        return;
+      } else {
+        this.info(
+          `Job ${this.input.jobToWaitFor} not found in run ${previousRun.id}, awaiting full run for safety`,
+        );
+      }
+    }
+
     this.info(`✋Awaiting run ${previousRun.html_url} ...`);
+    return this.pollAndWait(secondsSoFar);
+  };
+
+  pollAndWait = async (secondsSoFar?: number) => {
     await new Promise((resolve) =>
       setTimeout(resolve, this.input.pollIntervalSeconds * 1000),
     );

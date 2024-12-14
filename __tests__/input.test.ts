@@ -15,6 +15,8 @@ describe("input", () => {
           "INPUT_POLL-INTERVAL-SECONDS": "5",
           "INPUT_SAME-BRANCH-ONLY": "false",
           "INPUT_INITIAL-WAIT-SECONDS": "5",
+          "INPUT_JOB-TO-WAIT-FOR": "job-name",
+          "INPUT_STEP-TO-WAIT-FOR": "step-name",
         }),
         {
           githubToken: "s3cr3t",
@@ -27,6 +29,8 @@ describe("input", () => {
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 5,
           sameBranchOnly: false,
+          jobToWaitFor: "job-name",
+          stepToWaitFor: "step-name",
           initialWaitSeconds: 5,
         },
       );
@@ -56,6 +60,8 @@ describe("input", () => {
           abortAfterSeconds: 10,
           pollIntervalSeconds: 5,
           sameBranchOnly: false,
+          jobToWaitFor: undefined,
+          stepToWaitFor: undefined,
           initialWaitSeconds: 0,
         },
       );
@@ -75,6 +81,19 @@ describe("input", () => {
       );
     });
 
+    it("rejects env with stepToWaitFor but no jobToWaitFor", () => {
+      assert.throws(() =>
+        parseInput({
+          GITHUB_REF: "refs/heads/foo",
+          GITHUB_REPOSITORY: "softprops/turnstyle",
+          GITHUB_WORKFLOW: "test",
+          GITHUB_RUN_ID: "1",
+          INPUT_TOKEN: "s3cr3t",
+          "INPUT_STEP-TO-WAIT-FOR": "step-name",
+        }),
+      );
+    });
+
     it("parses config from env with defaults", () => {
       assert.deepEqual(
         parseInput({
@@ -87,6 +106,8 @@ describe("input", () => {
           "INPUT_POLL-INTERVAL-SECONDS": "",
           "INPUT_SAME-BRANCH-ONLY": "",
           "INPUT_INITIAL-WAIT-SECONDS": "",
+          "INPUT_JOB-TO-WAIT-FOR": "",
+          "INPUT_STEP-TO-WAIT-FOR": "",
         }),
         {
           githubToken: "s3cr3t",
@@ -99,6 +120,8 @@ describe("input", () => {
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
           sameBranchOnly: true,
+          jobToWaitFor: "",
+          stepToWaitFor: "",
           initialWaitSeconds: 0,
         },
       );
@@ -125,6 +148,8 @@ describe("input", () => {
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
           sameBranchOnly: true,
+          jobToWaitFor: undefined,
+          stepToWaitFor: undefined,
           initialWaitSeconds: 0,
         },
       );

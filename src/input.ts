@@ -9,6 +9,8 @@ export interface Input {
   continueAfterSeconds: number | undefined;
   abortAfterSeconds: number | undefined;
   sameBranchOnly: boolean;
+  jobToWaitFor: string | undefined;
+  stepToWaitFor: string | undefined;
   initialWaitSeconds: number;
 }
 
@@ -39,6 +41,12 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
 
   const sameBranchOnly =
     env["INPUT_SAME-BRANCH-ONLY"] === "true" || !env["INPUT_SAME-BRANCH-ONLY"]; // true if not specified
+
+  const jobToWaitFor = env["INPUT_JOB-TO-WAIT-FOR"];
+  const stepToWaitFor = env["INPUT_STEP-TO-WAIT-FOR"];
+  if (stepToWaitFor && !jobToWaitFor) {
+    throw new Error("step-to-wait-for requires job-to-wait-for to be defined");
+  }
   return {
     githubToken,
     owner,
@@ -50,6 +58,8 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     continueAfterSeconds,
     abortAfterSeconds,
     sameBranchOnly,
+    jobToWaitFor,
+    stepToWaitFor,
     initialWaitSeconds,
   };
 };
