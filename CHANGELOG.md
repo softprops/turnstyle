@@ -1,3 +1,10 @@
+## 2.3.0
+
+## What's Changed
+
+### Exciting New Features 🎉
+* Adding support for waiting on specific job/step completion in turnstyle by @selecsosi in https://github.com/softprops/turnstyle/pull/98
+
 ## 2.2.3
 
 fix lockfile issue
