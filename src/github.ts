@@ -86,4 +86,33 @@ export class OctokitGitHub {
       (values) => values.flat(),
     );
   };
+
+  jobs = async (owner: string, repo: string, run_id: number) => {
+    const options: Endpoints["GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs"]["parameters"] =
+      {
+        owner,
+        repo,
+        run_id,
+        per_page: 100,
+      };
+
+    return this.octokit.paginate(
+      this.octokit.actions.listJobsForWorkflowRun,
+      options,
+    );
+  };
+
+  steps = async (owner: string, repo: string, job_id: number) => {
+    const options: Endpoints["GET /repos/{owner}/{repo}/actions/jobs/{job_id}"]["parameters"] =
+      {
+        owner,
+        repo,
+        job_id,
+      };
+    const job = await this.octokit.paginate(
+      this.octokit.actions.getJobForWorkflowRun,
+      options,
+    );
+    return job?.steps || [];
+  };
 }
