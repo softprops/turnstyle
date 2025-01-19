@@ -109,10 +109,8 @@ export class OctokitGitHub {
         repo,
         job_id,
       };
-    const job = await this.octokit.paginate(
-      this.octokit.actions.getJobForWorkflowRun,
-      options,
-    );
-    return job?.steps || [];
+    const { data: job } =
+      await this.octokit.actions.getJobForWorkflowRun(options);
+    return job.steps || [];
   };
 }
