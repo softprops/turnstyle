@@ -23,19 +23,19 @@
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@octokit/plugin-throttling": "^9.4.0",
+    "@octokit/plugin-throttling": "^9.6.0",
     "@octokit/rest": "^21.1.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.13",
-    "@types/node": "^22.13.8",
+    "@types/node": "^22.13.17",
     "@vercel/ncc": "^0.38.3",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-circus": "^29.7.0",
-    "lint-staged": "^15.4.3",
-    "prettier": "^3.5.2",
-    "ts-jest": "^29.2.6",
+    "lint-staged": "^15.5.0",
+    "prettier": "^3.5.3",
+    "ts-jest": "^29.3.1",
     "typescript": "^5.8.2"
   },
   "lint-staged": {
