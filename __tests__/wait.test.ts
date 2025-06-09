@@ -1,5 +1,7 @@
 import * as assert from "assert";
 
+import { beforeEach, describe, it, test, vi } from "vitest";
+
 import { Waiter } from "../src/wait";
 import { Input } from "../src/input";
 
@@ -112,7 +114,7 @@ describe("wait", () => {
           html_url: "1",
         };
 
-        const mockedRunsFunc = jest
+        const mockedRunsFunc = vi
           .fn()
           .mockReturnValueOnce(Promise.resolve([run]))
           .mockReturnValue(Promise.resolve([]));
@@ -165,7 +167,7 @@ describe("wait", () => {
           html_url: input.runId + 1 + "",
         });
 
-        const mockedRunsFunc = jest.fn();
+        const mockedRunsFunc = vi.fn();
         mockedRunsFunc
           .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(0)))
           .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(0, 2)))
@@ -177,7 +179,7 @@ describe("wait", () => {
 
         const githubClient = {
           runs: mockedRunsFunc,
-          run: jest.fn(),
+          run: vi.fn(),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow]),
         };
@@ -231,7 +233,7 @@ describe("wait", () => {
           html_url: input.runId + 1 + "",
         });
 
-        const mockedRunsFunc = jest.fn();
+        const mockedRunsFunc = vi.fn();
         mockedRunsFunc
           .mockReturnValueOnce(Promise.resolve(existingRuns.slice(0)))
           .mockReturnValueOnce(Promise.resolve(existingRuns.slice(0, 1)))
@@ -243,7 +245,7 @@ describe("wait", () => {
 
         const githubClient = {
           runs: mockedRunsFunc,
-          run: jest.fn(),
+          run: vi.fn(),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow]),
         };
@@ -270,7 +272,7 @@ describe("wait", () => {
       });
 
       it("will retry to get previous runs, if not found during first try", async () => {
-        jest.setTimeout(10 * 1000);
+        vi.setConfig({ testTimeout: 10_1000 });
         input.initialWaitSeconds = 2;
         // give the current run a random id
         input.runId = 2;
@@ -281,7 +283,7 @@ describe("wait", () => {
           html_url: "1",
         };
 
-        const mockedRunsFunc = jest
+        const mockedRunsFunc = vi
           .fn()
           // don't return any runs in the first attempt
           .mockReturnValueOnce(Promise.resolve([]))
@@ -336,7 +338,7 @@ describe("wait", () => {
             branch: string | undefined,
             workflowId: number,
           ) => Promise.resolve([run]),
-          jobs: jest
+          jobs: vi
             .fn()
             .mockResolvedValueOnce([job])
             .mockResolvedValue([{ ...job, status: "completed" }]),
@@ -392,8 +394,8 @@ describe("wait", () => {
             branch: string | undefined,
             workflowId: number,
           ) => Promise.resolve([run]),
-          jobs: jest.fn().mockResolvedValue([job]),
-          steps: jest
+          jobs: vi.fn().mockResolvedValue([job]),
+          steps: vi
             .fn()
             .mockResolvedValueOnce([step])
             .mockResolvedValue([{ ...step, status: "completed" }]),
@@ -443,7 +445,7 @@ describe("wait", () => {
 
         const githubClient = {
           // On the first call have both runs in progress, on the second call have the first run completed
-          runs: jest
+          runs: vi
             .fn()
             .mockResolvedValueOnce([run, run2])
             .mockResolvedValue([
@@ -451,7 +453,7 @@ describe("wait", () => {
               run2,
             ]),
           // This workflow's jobs is not the one we are looking for (should be fine, we fall back to waiting the full run)
-          jobs: jest.fn().mockResolvedValue([notOurTestJob]),
+          jobs: vi.fn().mockResolvedValue([notOurTestJob]),
           workflows: async (owner: string, repo: string) =>
             Promise.resolve([workflow]),
         };

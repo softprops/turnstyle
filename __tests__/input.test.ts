@@ -1,6 +1,8 @@
 import * as assert from "assert";
 import { parseInput } from "../src/input";
 
+import { describe, it } from "vitest";
+
 describe("input", () => {
   describe("parseInput", () => {
     it("parses config from env with custom inputs", () => {
