@@ -272,6 +272,7 @@ describe("wait", () => {
       });
 
       it("will retry to get previous runs, if not found during first try", async () => {
+        // see discussions in https://github.com/vitest-dev/vitest/discussions/7890
         vi.setConfig({ testTimeout: 10_1000 });
         input.initialWaitSeconds = 2;
         // give the current run a random id
