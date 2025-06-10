@@ -2,8 +2,7 @@
   "compilerOptions": {
     /* Basic Options */
     // "incremental": true,                   /* Enable incremental compilation */
-    "moduleResolution": "nodenext",
-    "target": "ES2024",
+    "target": "ES2022",
     "module": "NodeNext",
     // "allowJs": true,                       /* Allow javascript files to be compiled. */
     // "checkJs": true,                       /* Report errors in .js files. */
