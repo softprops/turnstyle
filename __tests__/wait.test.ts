@@ -1,6 +1,4 @@
-import * as assert from 'assert';
-
-import { beforeEach, describe, it, vi } from 'vitest';
+import { assert, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Input } from '../src/input';
 import { Waiter } from '../src/wait';
@@ -95,7 +93,7 @@ describe('wait', () => {
           },
           () => {},
         );
-        await assert.rejects(waiter.wait(), {
+        await expect(waiter.wait()).rejects.toMatchObject({
           name: 'Error',
           message: 'Aborted after waiting 1 seconds',
         });

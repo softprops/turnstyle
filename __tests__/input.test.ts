@@ -1,7 +1,6 @@
-import * as assert from 'assert';
 import { parseInput } from '../src/input';
 
-import { describe, it } from 'vitest';
+import { assert, describe, it } from 'vitest';
 
 describe('input', () => {
   describe('parseInput', () => {
