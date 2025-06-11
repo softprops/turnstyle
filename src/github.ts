@@ -1,19 +1,17 @@
-import { Octokit } from "@octokit/rest";
-import { Endpoints } from "@octokit/types";
-import { debug, warning } from "@actions/core";
+import { debug, warning } from '@actions/core';
+import { Octokit } from '@octokit/rest';
+import { Endpoints } from '@octokit/types';
 
 export class OctokitGitHub {
   private readonly octokit: Octokit;
   constructor(githubToken: string) {
-    Octokit.plugin(require("@octokit/plugin-throttling"));
+    Octokit.plugin(require('@octokit/plugin-throttling'));
     this.octokit = new Octokit({
-      baseUrl: process.env["GITHUB_API_URL"] || "https://api.github.com",
+      baseUrl: process.env['GITHUB_API_URL'] || 'https://api.github.com',
       auth: githubToken,
       throttle: {
         onRateLimit: (retryAfter, options) => {
-          warning(
-            `Request quota exhausted for request ${options.method} ${options.url}`,
-          );
+          warning(`Request quota exhausted for request ${options.method} ${options.url}`);
 
           if (options.request.retryCount === 0) {
             // only retries once
@@ -36,13 +34,8 @@ export class OctokitGitHub {
       per_page: 100,
     });
 
-  runs = async (
-    owner: string,
-    repo: string,
-    branch: string | undefined,
-    workflow_id: number,
-  ) => {
-    const options: Endpoints["GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs"]["parameters"] =
+  runs = async (owner: string, repo: string, branch: string | undefined, workflow_id: number) => {
+    const options: Endpoints['GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs']['parameters'] =
       {
         owner,
         repo,
@@ -56,15 +49,15 @@ export class OctokitGitHub {
 
     const in_progress_options = {
       ...options,
-      status: "in_progress" as const,
+      status: 'in_progress' as const,
     };
     const queued_options = {
       ...options,
-      status: "queued" as const,
+      status: 'queued' as const,
     };
     const waiting_options = {
       ...options,
-      status: "waiting" as const,
+      status: 'waiting' as const,
     };
 
     const in_progress_runs = this.octokit.paginate(
@@ -82,13 +75,13 @@ export class OctokitGitHub {
       waiting_options,
     );
 
-    return Promise.all([in_progress_runs, queued_runs, waiting_runs]).then(
-      (values) => values.flat(),
+    return Promise.all([in_progress_runs, queued_runs, waiting_runs]).then((values) =>
+      values.flat(),
     );
   };
 
   jobs = async (owner: string, repo: string, run_id: number) => {
-    const options: Endpoints["GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs"]["parameters"] =
+    const options: Endpoints['GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs']['parameters'] =
       {
         owner,
         repo,
@@ -96,21 +89,16 @@ export class OctokitGitHub {
         per_page: 100,
       };
 
-    return this.octokit.paginate(
-      this.octokit.actions.listJobsForWorkflowRun,
-      options,
-    );
+    return this.octokit.paginate(this.octokit.actions.listJobsForWorkflowRun, options);
   };
 
   steps = async (owner: string, repo: string, job_id: number) => {
-    const options: Endpoints["GET /repos/{owner}/{repo}/actions/jobs/{job_id}"]["parameters"] =
-      {
-        owner,
-        repo,
-        job_id,
-      };
-    const { data: job } =
-      await this.octokit.actions.getJobForWorkflowRun(options);
+    const options: Endpoints['GET /repos/{owner}/{repo}/actions/jobs/{job_id}']['parameters'] = {
+      owner,
+      repo,
+      job_id,
+    };
+    const { data: job } = await this.octokit.actions.getJobForWorkflowRun(options);
     return job.steps || [];
   };
 }

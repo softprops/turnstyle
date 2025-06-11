@@ -1,0 +1,15 @@
+# Build outputs
+dist/
+lib/
+coverage/
+
+# Dependencies
+node_modules/
+
+# Misc
+.github/
+*.log
+.DS_Store
+
+# Package files
+package-lock.json
