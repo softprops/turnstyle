@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 +     - name: Turnstyle
 +       uses: softprops/turnstyle@v2
       - name: Deploy
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
         uses: softprops/turnstyle@v2
       - name: Deploy
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
         uses: softprops/turnstyle@v2
         with:
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
         uses: softprops/turnstyle@v2
         with:
@@ -122,7 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
         uses: softprops/turnstyle@v2
         with:
@@ -131,7 +131,7 @@ jobs:
       - name: Deploy
         run: sleep 30
 ```
- 
+
 
 Finally, you can use the `force_continued` output to skip only a subset of steps
 by setting `continue-after-seconds` and conditioning future steps with
@@ -147,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
         id: turnstyle
         uses: softprops/turnstyle@v2
