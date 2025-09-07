@@ -1,9 +1,12 @@
 {
   "name": "turnstyle",
-  "version": "2.3.2",
+  "version": "3.0.0",
   "private": true,
   "description": "GitHub Action for limiting one workflow to complete at a time",
   "main": "lib/main.js",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "build": "ncc build src/main.ts --minify",
     "typecheck": "tsc --noEmit",
@@ -27,7 +30,7 @@
     "@octokit/rest": "^22.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.19.11",
+    "@types/node": "^24.3.1",
     "@vercel/ncc": "^0.38.3",
     "@vitest/coverage-v8": "^3.2.4",
     "husky": "^9.1.7",
