@@ -1,3 +1,8 @@
+## 3.0.0
+
+- Upgrade Node.js version to 24 in action
+Make sure your runner is on version v2.327.1 or later to ensure compatibility with this release. [Release Notes](https://github.com/actions/runner/releases/tag/v2.327.1)
+
 ## 2.4.0
 
 - Migrate from jest to vitest
