@@ -24,7 +24,7 @@ This can be problematic for workflows used as part of a continuous deployment pr
 
 ## 🤸 Usage
 
-The typical setup for turnstyle involves adding job step using `softprops/turnstyle@v2`.
+The typical setup for turnstyle involves adding job step using `softprops/turnstyle@v3`.
 
 ```diff
 name: Main
@@ -38,7 +38,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 +     - name: Turnstyle
-+       uses: softprops/turnstyle@v2
++       uses: softprops/turnstyle@v3
       - name: Deploy
         run: sleep 30
 ```
@@ -62,7 +62,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
       - name: Deploy
         run: sleep 30
 ```
@@ -81,7 +81,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
         with:
 +         continue-after-seconds: 180
       - name: Deploy
@@ -102,7 +102,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
         with:
 +         abort-after-seconds: 180
       - name: Deploy
@@ -124,7 +124,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
         with:
 +         job-to-wait-for: "main"
 +         step-to-wait-for: "Deploy"
@@ -150,7 +150,7 @@ jobs:
         uses: actions/checkout@v5
       - name: Turnstyle
         id: turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
         with:
 +         continue-after-seconds: 180
       - name: Deploy
