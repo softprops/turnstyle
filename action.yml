@@ -26,6 +26,8 @@ inputs:
     description: "Name of the job's step to wait for (unbound by default). Requires job-to-wait-for to be set"
   initial-wait-seconds:
     description: "Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first poll (0 by default, ie doesn't retry)"
+  queue-name:
+    description: 'Custom name for gruouping runs if not specified will take the workflow name'
 outputs:
   force_continued:
     description: "True if continue-after-seconds is used and the step using turnstyle continued. False otherwise."

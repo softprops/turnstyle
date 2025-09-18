@@ -49,7 +49,26 @@ export class Waiter implements Wait {
     );
 
     this.debug(`Found ${runs.length} ${this.workflowId} runs`);
-    const previousRuns = runs
+
+    let filteredRuns = runs;
+
+    if (this.input.queueName) {
+      const queueName = this.input.queueName;
+      filteredRuns = runs.filter((run) => {
+        const matchesQueue =
+          run.display_title?.includes(queueName) || run.name?.includes(queueName);
+
+        if (matchesQueue) {
+          this.debug(`Run ${run.id} matches queue name: ${queueName}`);
+        }
+
+        return matchesQueue;
+      });
+
+      this.debug(`After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`);
+    }
+
+    const previousRuns = filteredRuns
       .filter((run) => run.id < this.input.runId)
       .filter((run) => {
         const isSuccessful: boolean = run.conclusion === 'success';
