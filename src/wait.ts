@@ -54,6 +54,7 @@ export class Waiter implements Wait {
 
     if (this.input.queueName) {
       const queueName = this.input.queueName;
+      this.info(`Filtering runs for queue name: ${queueName}`);
       filteredRuns = runs.filter((run) => {
         const matchesQueue =
           run.display_title?.includes(queueName) || run.name?.includes(queueName);
