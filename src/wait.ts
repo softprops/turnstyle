@@ -50,10 +50,10 @@ export class Waiter implements Wait {
 
     this.debug(`Found ${runs.length} ${this.workflowId} runs`);
 
+    const queueName = this.input.queueName;
     let filteredRuns = runs;
 
-    if (this.input.queueName) {
-      const queueName = this.input.queueName;
+    if (queueName) {
       this.info(`Filtering runs for queue name: ${queueName}`);
       filteredRuns = runs.filter((run) => {
         const matchesQueue =
