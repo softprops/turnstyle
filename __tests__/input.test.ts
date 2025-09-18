@@ -33,6 +33,7 @@ describe('input', () => {
           jobToWaitFor: 'job-name',
           stepToWaitFor: 'step-name',
           initialWaitSeconds: 5,
+          queueName: undefined,
         },
       );
     });
@@ -64,6 +65,7 @@ describe('input', () => {
           jobToWaitFor: undefined,
           stepToWaitFor: undefined,
           initialWaitSeconds: 0,
+          queueName: undefined,
         },
       );
     });
@@ -78,6 +80,7 @@ describe('input', () => {
           INPUT_TOKEN: 's3cr3t',
           'INPUT_CONTINUE-AFTER-SECONDS': '10',
           'INPUT_ABORT-AFTER-SECONDS': '2',
+          queueName: undefined,
         }),
       );
     });
@@ -124,6 +127,7 @@ describe('input', () => {
           jobToWaitFor: '',
           stepToWaitFor: '',
           initialWaitSeconds: 0,
+          queueName: undefined,
         },
       );
     });
@@ -152,6 +156,42 @@ describe('input', () => {
           jobToWaitFor: undefined,
           stepToWaitFor: undefined,
           initialWaitSeconds: 0,
+          queueName: undefined,
+        },
+      );
+    });
+
+    it('parses config from env with queueName', () => {
+      assert.deepEqual(
+        parseInput({
+          GITHUB_REF: 'refs/heads/foo',
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW: 'test',
+          GITHUB_RUN_ID: '1',
+          INPUT_TOKEN: 's3cr3t',
+          'INPUT_CONTINUE-AFTER-SECONDS': '10',
+          'INPUT_POLL-INTERVAL-SECONDS': '5',
+          'INPUT_SAME-BRANCH-ONLY': 'false',
+          'INPUT_INITIAL-WAIT-SECONDS': '5',
+          'INPUT_JOB-TO-WAIT-FOR': 'job-name',
+          'INPUT_STEP-TO-WAIT-FOR': 'step-name',
+          'INPUT_QUEUE-NAME': 'queue-name',
+        }),
+        {
+          githubToken: 's3cr3t',
+          owner: 'softprops',
+          repo: 'turnstyle',
+          branch: 'foo',
+          workflowName: 'test',
+          runId: 1,
+          continueAfterSeconds: 10,
+          abortAfterSeconds: undefined,
+          pollIntervalSeconds: 5,
+          sameBranchOnly: false,
+          jobToWaitFor: 'job-name',
+          stepToWaitFor: 'step-name',
+          initialWaitSeconds: 5,
+          queueName: 'queue-name',
         },
       );
     });
