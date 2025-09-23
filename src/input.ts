@@ -12,6 +12,7 @@ export interface Input {
   jobToWaitFor: string | undefined;
   stepToWaitFor: string | undefined;
   initialWaitSeconds: number;
+  queueName: string | undefined;
 }
 
 export const parseInput = (env: Record<string, string | undefined>): Input => {
@@ -40,6 +41,8 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
 
   const jobToWaitFor = env['INPUT_JOB-TO-WAIT-FOR'];
   const stepToWaitFor = env['INPUT_STEP-TO-WAIT-FOR'];
+  const queueName = env['INPUT_QUEUE-NAME'];
+
   if (stepToWaitFor && !jobToWaitFor) {
     throw new Error('step-to-wait-for requires job-to-wait-for to be defined');
   }
@@ -57,5 +60,6 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     jobToWaitFor,
     stepToWaitFor,
     initialWaitSeconds,
+    queueName,
   };
 };
