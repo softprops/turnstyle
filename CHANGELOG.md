@@ -1,3 +1,7 @@
+## 3.1.0
+
+* feat: filter workflows by queue-name by @cdiaz-nex in https://github.com/softprops/turnstyle/pull/117
+
 ## 3.0.0
 
 - Upgrade Node.js version to 24 in action
