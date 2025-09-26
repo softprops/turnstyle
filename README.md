@@ -24,7 +24,7 @@ This can be problematic for workflows used as part of a continuous deployment pr
 
 ## 🤸 Usage
 
-The typical setup for turnstyle involves adding job step using `softprops/turnstyle@v2`.
+The typical setup for turnstyle involves adding job step using `softprops/turnstyle@v3`.
 
 ```diff
 name: Main
@@ -36,9 +36,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 +     - name: Turnstyle
-+       uses: softprops/turnstyle@v2
++       uses: softprops/turnstyle@v3
       - name: Deploy
         run: sleep 30
 ```
@@ -60,9 +60,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
       - name: Deploy
         run: sleep 30
 ```
@@ -79,9 +79,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
         with:
 +         continue-after-seconds: 180
       - name: Deploy
@@ -100,14 +100,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
         with:
 +         abort-after-seconds: 180
       - name: Deploy
         run: sleep 30
 ```
+
+you can also wait on a specific job (and step) to complete in a run by using the `jobs.<job_id>.steps.with.job-to-wait-for`
+and `jobs.<job_id>.steps.with.step-to-wait-for` inputs. Specify the name of the job/step to wait for.
+
+```diff
+name: Main
+
+on: push
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Turnstyle
+        uses: softprops/turnstyle@v3
+        with:
++         job-to-wait-for: "main"
++         step-to-wait-for: "Deploy"
+      - name: Deploy
+        run: sleep 30
+```
+
 
 Finally, you can use the `force_continued` output to skip only a subset of steps
 by setting `continue-after-seconds` and conditioning future steps with
@@ -123,10 +147,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Turnstyle
         id: turnstyle
-        uses: softprops/turnstyle@v2
+        uses: softprops/turnstyle@v3
         with:
 +         continue-after-seconds: 180
       - name: Deploy
@@ -137,12 +161,14 @@ jobs:
 #### inputs
 
 | Name                     | Type    | Description                                                                                                                            |
-| ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| ------------------------ | ------- |----------------------------------------------------------------------------------------------------------------------------------------|
 | `continue-after-seconds` | number  | Maximum number of seconds to wait before moving forward (unbound by default). Mutually exclusive with abort-after-seconds              |
 | `abort-after-seconds`    | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds         |
 | `poll-interval-seconds`  | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                               |
 | `same-branch-only`       | boolean | Only wait on other runs from the same branch (defaults to true)                                                                        |
 | `initial-wait-seconds`   | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt |
+| `job-to-wait-for`        | string  | Name of the workflow's job to wait for (unbound by default).                                                                           |
+| `step-to-wait-for`       | string  | Name of the step to wait for (unbound by default). Required if job-to-wait-for is set.                                                 |
 
 #### outputs
 

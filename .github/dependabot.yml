@@ -4,15 +4,26 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+    groups:
+      npm:
+        patterns:
+          - "*"
     ignore:
       - dependency-name: node-fetch
         versions:
           - ">=3.0.0"
+      - dependency-name: "@types/node"
+        versions:
+          - ">=25.0.0"
     commit-message:
       prefix: "chore(deps)"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: monthly
+    groups:
+      npm:
+        patterns:
+          - "*"
     commit-message:
       prefix: "chore(deps)"

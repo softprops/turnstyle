@@ -5,7 +5,7 @@ author: 'softprops'
 env:
   'GITHUB_TOKEN': 'Repository token provided by Github Actions secrets'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
 inputs:
   token:
@@ -20,10 +20,16 @@ inputs:
     description: "Maximum number of seconds to wait before failing the step (unbound by default). Mutually exclusive with continue-after-seconds"
   same-branch-only:
     description: "Only wait on other runs from the same branch (defaults to true)"
+  job-to-wait-for:
+    description: "Name of the workflow run's job to wait for (unbound by default)"
+  step-to-wait-for:
+    description: "Name of the job's step to wait for (unbound by default). Requires job-to-wait-for to be set"
   initial-wait-seconds:
     description: "Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first poll (0 by default, ie doesn't retry)"
   exponential-backoff-retries:
     description: "Apply an exponential backoff to poll-interval-seconds (defaults to false)"
+  queue-name:
+    description: 'Custom name for grouping runs by the value if not specified will take the workflow name (unbound by default)'
 outputs:
   force_continued:
     description: "True if continue-after-seconds is used and the step using turnstyle continued. False otherwise."

@@ -1,3 +1,33 @@
+## 3.1.0
+
+* feat: filter workflows by queue-name by @cdiaz-nex in https://github.com/softprops/turnstyle/pull/117
+
+## 3.0.0
+
+- Upgrade Node.js version to 24 in action
+Make sure your runner is on version v2.327.1 or later to ensure compatibility with this release. [Release Notes](https://github.com/actions/runner/releases/tag/v2.327.1)
+
+## 2.4.0
+
+- Migrate from jest to vitest
+- Bump to use node 24
+- Dependency updates
+
+## 2.3.2
+
+maintenance release with updated dependencies
+
+## 2.3.1
+
+maintenance release with updated dependencies
+
+## 2.3.0
+
+## What's Changed
+
+### Exciting New Features 🎉
+* Adding support for waiting on specific job/step completion in turnstyle by @selecsosi in https://github.com/softprops/turnstyle/pull/98
+
 ## 2.2.3
 
 fix lockfile issue
