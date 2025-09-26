@@ -32,10 +32,7 @@ export class Waiter implements Wait {
   wait = async (secondsSoFar?: number) => {
     let pollingInterval = this.input.pollIntervalSeconds;
 
-    if (
-      this.input.continueAfterSeconds &&
-      (secondsSoFar || 0) >= this.input.continueAfterSeconds
-    ) {
+    if (this.input.continueAfterSeconds && (secondsSoFar || 0) >= this.input.continueAfterSeconds) {
       this.info(`🤙Exceeded wait seconds. Continuing...`);
       setOutput('force_continued', '1');
       return secondsSoFar || 0;
@@ -147,12 +144,8 @@ export class Waiter implements Wait {
     this.info(`✋Awaiting run ${previousRun.html_url} ...`);
 
     if (this.input.exponentialBackoffRetries) {
-      pollingInterval =
-        this.input.pollIntervalSeconds * (2 * this.attempt || 1);
-      this.info(
-        `🔁 Attempt ${this.attempt + 1
-        }, next will be in ${pollingInterval} seconds`,
-      );
+      pollingInterval = this.input.pollIntervalSeconds * (2 * this.attempt || 1);
+      this.info(`🔁 Attempt ${this.attempt + 1}, next will be in ${pollingInterval} seconds`);
       this.attempt++;
     }
 

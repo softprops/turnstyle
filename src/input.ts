@@ -38,9 +38,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     ? parseInt(env['INPUT_INITIAL-WAIT-SECONDS'], 10)
     : 0;
 
-
-  const exponentialBackoffRetries =
-    env["INPUT_EXPONENTIAL-BACKOFF-RETRIES"] === "true" || false;
+  const exponentialBackoffRetries = env['INPUT_EXPONENTIAL-BACKOFF-RETRIES'] === 'true' || false;
 
   const sameBranchOnly = env['INPUT_SAME-BRANCH-ONLY'] === 'true' || !env['INPUT_SAME-BRANCH-ONLY']; // true if not specified
 

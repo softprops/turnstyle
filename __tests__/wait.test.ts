@@ -452,23 +452,23 @@ describe('wait', () => {
         ]);
       });
 
-      it("will wait for all previous runs with exponential backoff", async () => {
+      it('will wait for all previous runs with exponential backoff', async () => {
         input.exponentialBackoffRetries = true;
         const inProgressRuns = [
           {
             id: 1,
-            status: "in_progress",
-            html_url: "1",
+            status: 'in_progress',
+            html_url: '1',
           },
           {
             id: 2,
-            status: "in_progress",
-            html_url: "2",
+            status: 'in_progress',
+            html_url: '2',
           },
           {
             id: 3,
-            status: "queued",
-            html_url: "3",
+            status: 'queued',
+            html_url: '3',
           },
         ];
         // Give the current run an id that makes it the last in the queue.
@@ -477,22 +477,19 @@ describe('wait', () => {
         // are interested in.
         inProgressRuns.push({
           id: input.runId + 1,
-          status: "in_progress",
-          html_url: input.runId + 1 + "",
+          status: 'in_progress',
+          html_url: input.runId + 1 + '',
         });
 
         const mockedRunsFunc = vi
           .fn()
           .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(0)))
           .mockReturnValueOnce(Promise.resolve(inProgressRuns.slice(1)))
-          .mockReturnValue(
-            Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1)),
-          );
+          .mockReturnValue(Promise.resolve(inProgressRuns.slice(inProgressRuns.length - 1)));
 
         const githubClient = {
           runs: mockedRunsFunc,
-          workflows: async (owner: string, repo: string) =>
-            Promise.resolve([workflow]),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
         };
 
         const messages: Array<string> = [];
