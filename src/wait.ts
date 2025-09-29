@@ -117,7 +117,13 @@ export class Waiter implements Wait {
         const step = steps.find((step) => step.name === this.input.stepToWaitFor);
         if (step && step.status !== 'completed') {
           this.info(`✋Awaiting step completion from job ${job.html_url} ...`);
-          return this.pollAndWait(secondsSoFar);
+          let pollingInterval = this.input.pollIntervalSeconds;
+          if (this.input.exponentialBackoffRetries) {
+            pollingInterval = this.input.pollIntervalSeconds * (2 * this.attempt || 1);
+            this.info(`🔁 Attempt ${this.attempt + 1}, next will be in ${pollingInterval} seconds`);
+            this.attempt++;
+          }
+          return this.pollAndWait(secondsSoFar, pollingInterval);
         } else if (step) {
           this.info(`Step ${this.input.stepToWaitFor} completed from run ${previousRun.html_url}`);
           return;
@@ -130,7 +136,13 @@ export class Waiter implements Wait {
 
       if (job && job.status !== 'completed') {
         this.info(`✋Awaiting job run completion from job ${job.html_url} ...`);
-        return this.pollAndWait(secondsSoFar);
+        let pollingInterval = this.input.pollIntervalSeconds;
+        if (this.input.exponentialBackoffRetries) {
+          pollingInterval = this.input.pollIntervalSeconds * (2 * this.attempt || 1);
+          this.info(`🔁 Attempt ${this.attempt + 1}, next will be in ${pollingInterval} seconds`);
+          this.attempt++;
+        }
+        return this.pollAndWait(secondsSoFar, pollingInterval);
       } else if (job) {
         this.info(`Job ${this.input.jobToWaitFor} completed from run ${previousRun.html_url}`);
         return;
@@ -149,11 +161,12 @@ export class Waiter implements Wait {
       this.attempt++;
     }
 
-    return this.pollAndWait(secondsSoFar);
+    return this.pollAndWait(secondsSoFar, pollingInterval);
   };
 
-  pollAndWait = async (secondsSoFar?: number) => {
-    await new Promise((resolve) => setTimeout(resolve, this.input.pollIntervalSeconds * 1000));
-    return this.wait((secondsSoFar || 0) + this.input.pollIntervalSeconds);
+  pollAndWait = async (secondsSoFar?: number, pollingInterval?: number) => {
+    const intervalToUse = pollingInterval || this.input.pollIntervalSeconds;
+    await new Promise((resolve) => setTimeout(resolve, intervalToUse * 1000));
+    return this.wait((secondsSoFar || 0) + intervalToUse);
   };
 }
