@@ -18,7 +18,7 @@ async function run() {
     debug(`Found ${workflows.length} workflows in ${input.owner}/${input.repo}`);
     const workflow_id = workflows.find((workflow) => workflow.name == input.workflowName)?.id;
     if (workflow_id) {
-      await new Waiter(workflow_id, github, input, info, debug).wait();
+      await new Waiter(workflow_id, github, input, info, debug, workflows).wait();
     } else {
       setFailed(`No workflow found matching workflow_id: ${workflow_id}`);
     }

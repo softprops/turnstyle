@@ -12,6 +12,7 @@ export class Waiter implements Wait {
   private input: Input;
   private githubClient: GitHub;
   private readonly workflowId: any;
+  private readonly allWorkflows: any[];
 
   constructor(
     workflowId: any,
@@ -19,12 +20,14 @@ export class Waiter implements Wait {
     input: Input,
     info: (msg: string) => void,
     debug: (msg: string) => void,
+    allWorkflows: any[] = [],
   ) {
     this.workflowId = workflowId;
     this.input = input;
     this.githubClient = githubClient;
     this.info = info;
     this.debug = debug;
+    this.allWorkflows = allWorkflows;
   }
 
   wait = async (secondsSoFar?: number) => {
@@ -53,17 +56,26 @@ export class Waiter implements Wait {
     const queueName = this.input.queueName;
     let filteredRuns = runs;
 
-    if (queueName) {
-      this.info(`Filtering runs for queue name: ${queueName}`);
-      filteredRuns = runs.filter((run) => {
-        const matchesQueue =
-          run.display_title?.includes(queueName) || run.name?.includes(queueName);
+    if (queueName && this.allWorkflows.length > 0) {
+      this.info(
+        `Filtering across ${this.allWorkflows.length} workflows for queue name: ${queueName}`,
+      );
 
-        if (matchesQueue) {
-          this.debug(`Run ${run.id} matches queue name: ${queueName}`);
-        }
+      const getRunsPromises = this.allWorkflows.map((workflow) =>
+        this.githubClient.runs(
+          this.input.owner,
+          this.input.repo,
+          this.input.sameBranchOnly ? this.input.branch : undefined,
+          workflow.id,
+        ),
+      );
 
-        return matchesQueue;
+      const runsAllWorkflows = await Promise.all(getRunsPromises);
+      const flattenedRuns = runsAllWorkflows.flat();
+
+      filteredRuns = flattenedRuns.filter((run) => {
+        const matchesQueue = run.display_title || run.name || '';
+        return matchesQueue.includes(queueName);
       });
 
       this.debug(`After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`);
