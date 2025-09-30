@@ -55,27 +55,45 @@ export class Waiter implements Wait {
 
     const queueName = this.input.queueName;
     let filteredRuns = runs;
+    const allWorkflowsSize = this.allWorkflows.length;
 
-    if (queueName && this.allWorkflows.length > 0) {
-      this.info(
-        `Filtering across ${this.allWorkflows.length} workflows for queue name: ${queueName}`,
-      );
+    if (queueName && allWorkflowsSize > 0) {
+      this.debug(`Searching across ${allWorkflowsSize} workflows for queue name: ${queueName}`);
+      const BATCH_SIZE = 10;
+      const allRuns: any[] = [];
+      for (let i = 0; i < allWorkflowsSize; i += BATCH_SIZE) {
+        const batch = this.allWorkflows.slice(i, i + BATCH_SIZE);
+        this.debug(
+          `Processing workflow batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allWorkflowsSize / BATCH_SIZE)}`,
+        );
+        const getRunsPromises = batch.map((workflow) =>
+          this.githubClient.runs(
+            this.input.owner,
+            this.input.repo,
+            this.input.sameBranchOnly ? this.input.branch : undefined,
+            workflow.id,
+          ),
+        );
+        const batchResults = await Promise.allSettled(getRunsPromises);
+        batchResults.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            allRuns.push(...result.value);
+            return;
+          }
+          const workflowId = batch[index].id;
+          this.debug(`Failed to fetch runs for workflow ${workflowId}: ${result.reason}`);
+        });
+      }
 
-      const getRunsPromises = this.allWorkflows.map((workflow) =>
-        this.githubClient.runs(
-          this.input.owner,
-          this.input.repo,
-          this.input.sameBranchOnly ? this.input.branch : undefined,
-          workflow.id,
-        ),
-      );
-
-      const runsAllWorkflows = await Promise.all(getRunsPromises);
-      const flattenedRuns = runsAllWorkflows.flat();
-
-      filteredRuns = flattenedRuns.filter((run) => {
-        const matchesQueue = run.display_title || run.name || '';
-        return matchesQueue.includes(queueName);
+      filteredRuns = allRuns.filter((run) => {
+        const matchesQueue =
+          run.display_title?.includes(queueName) || run.name?.includes(queueName);
+        if (matchesQueue) {
+          this.debug(
+            `Run ${run.id} (${run.display_title || run.name}) matches queue: "${queueName}"`,
+          );
+        }
+        return matchesQueue;
       });
 
       this.debug(`After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`);
