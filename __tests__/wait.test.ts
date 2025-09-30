@@ -27,6 +27,7 @@ describe('wait', () => {
           jobToWaitFor: undefined,
           stepToWaitFor: undefined,
           initialWaitSeconds: 0,
+          queueName: undefined,
         };
       });
 
@@ -449,6 +450,493 @@ describe('wait', () => {
           `Job ${input.jobToWaitFor} not found in run ${run.id}, awaiting full run for safety`,
           `✋Awaiting run ${run.html_url} ...`,
         ]);
+      });
+
+      describe('queue-name cross-workflow behavior', () => {
+        let input: Input;
+        const workflow1 = {
+          id: 123,
+          name: 'random1 Workflow',
+        };
+        const workflow2 = {
+          id: 456,
+          name: 'random2 Workflow',
+        };
+
+        beforeEach(() => {
+          input = {
+            branch: 'master',
+            continueAfterSeconds: undefined,
+            abortAfterSeconds: undefined,
+            pollIntervalSeconds: 1,
+            githubToken: 'fake-token',
+            owner: 'org',
+            repo: 'repo',
+            runId: 4,
+            workflowName: workflow1.name,
+            sameBranchOnly: true,
+            jobToWaitFor: undefined,
+            stepToWaitFor: undefined,
+            initialWaitSeconds: 0,
+            queueName: undefined,
+          };
+        });
+
+        it('should search across all workflows when queue-name is provided', async () => {
+          input.queueName = 'repoa';
+          input.runId = 4;
+
+          const workflow1Runs = [
+            {
+              id: 1,
+              status: 'in_progress',
+              conclusion: null,
+              html_url: '1',
+              display_title: 'random1-repoa',
+              name: 'random1-repoa',
+            },
+          ];
+
+          const workflow2Runs = [
+            {
+              id: 3,
+              status: 'in_progress',
+              conclusion: null,
+              html_url: '3',
+              display_title: 'random2-repoa',
+              name: 'random2-repoa',
+            },
+          ];
+
+          const mockedRunsFunc = vi
+            .fn()
+            .mockResolvedValueOnce(workflow1Runs)
+            .mockResolvedValueOnce(workflow2Runs)
+            .mockResolvedValue(workflow1Runs.map((r) => ({ ...r, conclusion: 'success' })))
+            .mockResolvedValue(workflow2Runs.map((r) => ({ ...r, conclusion: 'success' })))
+            .mockResolvedValue([]);
+
+          const githubClient = {
+            runs: mockedRunsFunc,
+            workflows: async (owner: string, repo: string) =>
+              Promise.resolve([workflow1, workflow2]),
+          };
+
+          const messages: Array<string> = [];
+          const debugMessages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow1.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            (message: string) => {
+              debugMessages.push(message);
+            },
+            [workflow1, workflow2],
+          );
+
+          await waiter.wait();
+
+          expect(mockedRunsFunc.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+          const hasSearchMessage = debugMessages.some((msg) => msg.includes('Searching across'));
+          expect(hasSearchMessage).toBe(true);
+
+          expect(messages.length).toBeGreaterThan(0);
+          const hasQueueMessage = debugMessages.some(
+            (msg) => msg.includes('queue:') && msg.includes('repoa'),
+          );
+          expect(hasQueueMessage).toBe(true);
+
+          const awaitedRun3 = debugMessages.some((msg) => msg.includes('Run 3'));
+          expect(awaitedRun3).toBe(true);
+        });
+
+        it('should filter runs by queue-name substring in display_title', async () => {
+          input.queueName = 'repoa';
+          input.runId = 4;
+
+          const allRuns = [
+            {
+              id: 1,
+              status: 'in_progress',
+              conclusion: null,
+              html_url: '1',
+              display_title: 'random1 repoa',
+              name: 'random1 repoa',
+            },
+            {
+              id: 2,
+              status: 'in_progress',
+              conclusion: null,
+              html_url: '2',
+              display_title: 'random1 repob',
+              name: 'random1 repob',
+            },
+            {
+              id: 3,
+              status: 'in_progress',
+              conclusion: null,
+              html_url: '3',
+              display_title: 'random2 repoa',
+              name: 'random2 repoa',
+            },
+          ];
+
+          const githubClient = {
+            runs: vi
+              .fn()
+              .mockResolvedValueOnce(allRuns)
+              .mockResolvedValue(allRuns.map((r) => ({ ...r, conclusion: 'success' }))),
+            workflows: async () => Promise.resolve([workflow1, workflow2]),
+          };
+
+          const messages: Array<string> = [];
+          const debugMessages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow1.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            (message: string) => {
+              debugMessages.push(message);
+            },
+            [workflow1, workflow2],
+          );
+
+          await waiter.wait();
+
+          const matchDebugMessages = debugMessages.filter((msg) => msg.includes('matches queue'));
+
+          expect(matchDebugMessages.some((msg) => msg.includes('Run 1'))).toBe(true);
+          expect(matchDebugMessages.some((msg) => msg.includes('Run 3'))).toBe(true);
+
+          const awaitedRepob = matchDebugMessages.some((msg) => msg.includes('Run 2'));
+          expect(awaitedRepob).toBe(false);
+        });
+
+        it('should fallback to name field if display_title is not available', async () => {
+          input.queueName = 'repoa';
+          input.runId = 4;
+
+          const allRuns = [
+            {
+              id: 1,
+              status: 'in_progress',
+              conclusion: null,
+              html_url: '1',
+              display_title: null,
+              name: 'random1-repoa',
+            },
+          ];
+
+          const githubClient = {
+            runs: vi
+              .fn()
+              .mockResolvedValueOnce(allRuns)
+              .mockResolvedValue(allRuns.map((r) => ({ ...r, conclusion: 'success' }))),
+            workflows: async () => Promise.resolve([workflow1]),
+          };
+
+          const messages: Array<string> = [];
+          const debugMessages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow1.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            (message: string) => {
+              debugMessages.push(message);
+            },
+            [workflow1],
+          );
+
+          await waiter.wait();
+
+          const matchDebugMessage = debugMessages.find(
+            (msg) => msg.includes('Run 1') && msg.includes('matches queue'),
+          );
+          expect(matchDebugMessage).toBeDefined();
+        });
+
+        it('should use original behavior when queue-name is not provided', async () => {
+          input.queueName = undefined;
+          input.runId = 4;
+
+          const allRuns = [
+            {
+              id: 1,
+              status: 'in_progress',
+              html_url: '1',
+              conclusion: null,
+              display_title: 'random1-repoa',
+            },
+          ];
+
+          const mockedRunsFunc = vi
+            .fn()
+            .mockResolvedValueOnce(allRuns)
+            .mockResolvedValue(allRuns.map((r) => ({ ...r, conclusion: 'success' })))
+            .mockResolvedValue([]);
+
+          const githubClient = {
+            runs: mockedRunsFunc,
+            workflows: async (owner: string, repo: string) =>
+              Promise.resolve([workflow1, workflow2]),
+          };
+
+          const messages: Array<string> = [];
+          const debugMessages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow1.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            (message: string) => {
+              debugMessages.push(message);
+            },
+            [workflow1, workflow2],
+          );
+
+          await waiter.wait();
+          const hasSearchMessage = debugMessages.some((msg) => msg.includes('Searching across'));
+          expect(hasSearchMessage).toBe(false);
+          const hasQueueMessage = debugMessages.some((msg) => msg.includes('matches queue'));
+          expect(hasQueueMessage).toBe(false);
+          expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', 'master', workflow1.id);
+        });
+
+        it('should batch workflow requests to avoid rate limits', async () => {
+          input.queueName = 'repoa';
+
+          const manyWorkflows = Array.from({ length: 25 }, (_, i) => ({
+            id: i + 1,
+            name: `Workflow ${i + 1}`,
+          }));
+
+          const runs = [
+            {
+              id: 1,
+              status: 'in_progress',
+              html_url: '1',
+              display_title: 'test-repoa',
+            },
+          ];
+
+          const mockedRunsFunc = vi
+            .fn()
+            .mockResolvedValueOnce(runs)
+            .mockResolvedValue(runs.map((r) => ({ ...r, conclusion: 'success' })))
+            .mockResolvedValue([]);
+
+          const githubClient = {
+            runs: mockedRunsFunc,
+            workflows: async (owner: string, repo: string) => Promise.resolve(manyWorkflows),
+          };
+
+          const messages: Array<string> = [];
+          const debugMessages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow1.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            (message: string) => {
+              debugMessages.push(message);
+            },
+            manyWorkflows,
+          );
+
+          await waiter.wait();
+
+          expect(mockedRunsFunc).toHaveBeenCalledTimes(26);
+
+          const batchMessages = debugMessages.filter((msg) =>
+            msg.includes('Processing workflow batch'),
+          );
+          expect(batchMessages.length).toBeGreaterThan(1);
+          expect(batchMessages.length).toBe(3);
+        });
+
+        it('should handle failed workflow run fetches gracefully with Promise.allSettled', async () => {
+          input.queueName = 'repoa';
+          input.runId = 4;
+
+          const successfulRuns = [
+            {
+              id: 1,
+              status: 'in_progress',
+              html_url: '1',
+              conclusion: null,
+              display_title: 'random1-repoa',
+            },
+          ];
+
+          const mockedRunsFunc = vi
+            .fn()
+            .mockResolvedValueOnce(successfulRuns)
+            .mockResolvedValue(successfulRuns.map((r) => ({ ...r, conclusion: 'success' })))
+            .mockResolvedValueOnce([])
+            .mockRejectedValueOnce(new Error('API Error'))
+            .mockResolvedValue([]);
+
+          const githubClient = {
+            runs: mockedRunsFunc,
+            workflows: async (owner: string, repo: string) =>
+              Promise.resolve([workflow1, workflow2]),
+          };
+
+          const messages: Array<string> = [];
+          const debugMessages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow1.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            (message: string) => {
+              debugMessages.push(message);
+            },
+            [workflow1, workflow2],
+          );
+
+          await waiter.wait();
+          const failureMessage = debugMessages.find(
+            (msg) => msg.includes('Failed to fetch runs') && msg.includes(workflow2.id),
+          );
+          expect(failureMessage).toBeDefined();
+        });
+
+        it('should wait for previous runs across different workflows with same queue-name', async () => {
+          input.queueName = 'repoa';
+          input.runId = 4;
+
+          const workflow1Runs = [
+            {
+              id: 1,
+              status: 'in_progress',
+              html_url: '1',
+              display_title: 'random1-repoa',
+            },
+          ];
+
+          const workflow2Runs = [
+            {
+              id: 3,
+              status: 'in_progress',
+              html_url: '3',
+              display_title: 'random2-repoa',
+            },
+          ];
+
+          const mockedRunsFunc = vi
+            .fn()
+            .mockResolvedValueOnce(workflow1Runs)
+            .mockResolvedValueOnce(workflow2Runs)
+            .mockResolvedValue([]);
+
+          const githubClient = {
+            runs: mockedRunsFunc,
+            workflows: async (owner: string, repo: string) =>
+              Promise.resolve([workflow1, workflow2]),
+          };
+
+          const messages: Array<string> = [];
+          const debugMessages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow1.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            (message: string) => {
+              debugMessages.push(message);
+            },
+            [workflow1, workflow2],
+          );
+          await waiter.wait();
+
+          expect(messages[0]).toContain('✋Awaiting run 3');
+          const queueMessage = debugMessages.find((msg) => msg.includes('queue: "repoa"'));
+          expect(queueMessage).toBeDefined();
+        });
+
+        it('should not wait for previous runs across different workflows with different queue-name', async () => {
+          input.queueName = 'repoa';
+          input.runId = 4;
+
+          const workflow1Runs = [
+            {
+              id: 1,
+              status: 'in_progress',
+              html_url: '1',
+              display_title: 'random1-repoa',
+            },
+          ];
+
+          const workflow2Runs = [
+            {
+              id: 3,
+              status: 'in_progress',
+              html_url: '3',
+              display_title: 'random2-repob',
+            },
+          ];
+
+          const mockedRunsFunc = vi
+            .fn()
+            .mockResolvedValueOnce(workflow1Runs)
+            .mockResolvedValueOnce(workflow2Runs)
+            .mockResolvedValue([]);
+
+          const githubClient = {
+            runs: mockedRunsFunc,
+            workflows: async (owner: string, repo: string) =>
+              Promise.resolve([workflow1, workflow2]),
+          };
+
+          const messages: Array<string> = [];
+          const debugMessages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow1.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            (message: string) => {
+              debugMessages.push(message);
+            },
+            [workflow1, workflow2],
+          );
+          await waiter.wait();
+
+          expect(messages.length).toBe(0);
+          const queueMessage = debugMessages.find((msg) =>
+            msg.includes('0 runs match queue "repoa"'),
+          );
+          expect(queueMessage).toBeDefined();
+        });
       });
     });
   });
