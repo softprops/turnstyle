@@ -59,6 +59,18 @@ export class OctokitGitHub {
       ...options,
       status: 'waiting' as const,
     };
+    const pending_options = {
+      ...options,
+      status: 'pending' as const,
+    };
+    const requested_options = {
+      ...options,
+      status: 'requested' as const,
+    };
+    const action_required_options = {
+      ...options,
+      status: 'action_required' as const,
+    };
 
     const in_progress_runs = this.octokit.paginate(
       this.octokit.actions.listWorkflowRuns,
@@ -75,9 +87,29 @@ export class OctokitGitHub {
       waiting_options,
     );
 
-    return Promise.all([in_progress_runs, queued_runs, waiting_runs]).then((values) =>
-      values.flat(),
+    const pending_runs = this.octokit.paginate(
+      this.octokit.actions.listWorkflowRuns,
+      pending_options,
     );
+
+    const requested_runs = this.octokit.paginate(
+      this.octokit.actions.listWorkflowRuns,
+      requested_options,
+    );
+
+    const action_required_runs = this.octokit.paginate(
+      this.octokit.actions.listWorkflowRuns,
+      action_required_options,
+    );
+
+    return Promise.all([
+      in_progress_runs,
+      queued_runs,
+      waiting_runs,
+      pending_runs,
+      requested_runs,
+      action_required_runs,
+    ]).then((values) => values.flat());
   };
 
   jobs = async (owner: string, repo: string, run_id: number) => {

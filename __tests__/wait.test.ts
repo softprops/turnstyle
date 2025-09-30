@@ -192,7 +192,7 @@ describe('wait', () => {
         assert.deepEqual(messages[messages.length - 1], `✋Awaiting run ${input.runId - 1} ...`);
       });
 
-      it('will wait for in_progress, queued, and waiting runs', async () => {
+      it('will wait for in_progress, queued, waiting, pending, requested, and action_required runs', async () => {
         const existingRuns = [
           {
             id: 1,
@@ -208,6 +208,21 @@ describe('wait', () => {
             id: 3,
             status: 'waiting',
             html_url: '3',
+          },
+          {
+            id: 4,
+            status: 'pending',
+            html_url: '4',
+          },
+          {
+            id: 5,
+            status: 'requested',
+            html_url: '5',
+          },
+          {
+            id: 6,
+            status: 'action_required',
+            html_url: '6',
           },
         ];
         // Give the current run an id that makes it the last in the queue.
@@ -450,6 +465,60 @@ describe('wait', () => {
           `Job ${input.jobToWaitFor} not found in run ${run.id}, awaiting full run for safety`,
           `✋Awaiting run ${run.html_url} ...`,
         ]);
+      });
+
+      it('will skip failed and cancelled runs', async () => {
+        input.runId = 4;
+        const existingRuns = [
+          {
+            id: 1,
+            status: 'completed',
+            conclusion: 'failure',
+            html_url: '1',
+          },
+          {
+            id: 2,
+            status: 'completed',
+            conclusion: 'cancelled',
+            html_url: '2',
+          },
+          {
+            id: 3,
+            status: 'in_progress',
+            html_url: '3',
+          },
+        ];
+
+        const mockedRunsFunc = vi
+          .fn()
+          .mockReturnValueOnce(Promise.resolve(existingRuns))
+          .mockReturnValue(Promise.resolve(existingRuns.slice(0, 2)));
+
+        const githubClient = {
+          runs: mockedRunsFunc,
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const debugMessages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          () => {},
+          (message: string) => {
+            debugMessages.push(message);
+          },
+        );
+        await waiter.wait();
+
+        // Verify that failed and cancelled runs were skipped
+        const skippedMessages = debugMessages.filter((msg) =>
+          msg.includes('already completed'),
+        );
+        assert.equal(skippedMessages.length, 2);
+        assert(skippedMessages.some((msg) => msg.includes('run 1')));
+        assert(skippedMessages.some((msg) => msg.includes('run 2')));
       });
 
       it('will wait for all previous runs with exponential backoff', async () => {

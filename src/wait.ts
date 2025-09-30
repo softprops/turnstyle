@@ -76,15 +76,17 @@ export class Waiter implements Wait {
     const previousRuns = filteredRuns
       .filter((run) => run.id < this.input.runId)
       .filter((run) => {
-        const isSuccessful: boolean = run.conclusion === 'success';
+        // Only wait for runs that are still active (no conclusion yet)
+        // Skip runs that have completed with any final state (success, failure, cancelled, etc.)
+        const isActive = !run.conclusion;
 
-        if (isSuccessful) {
+        if (!isActive) {
           this.debug(
-            `Skipping run ${run.id}, status: ${run.status}, conclusion: ${run.conclusion}`,
+            `Skipping run ${run.id}, status: ${run.status}, conclusion: ${run.conclusion} (already completed)`,
           );
         }
 
-        return !isSuccessful;
+        return isActive;
       })
       .sort((a, b) => b.id - a.id);
     if (!previousRuns || !previousRuns.length) {
