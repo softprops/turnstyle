@@ -37,7 +37,7 @@
     "lint-staged": "^16.2.3",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
-    "vitest": "^3.1.4"
+    "vitest": "^3.2.4"
   },
   "lint-staged": {
     "{__tests__,src}/**/*.ts": [
