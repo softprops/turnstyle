@@ -30,12 +30,12 @@
     "@octokit/rest": "^22.0.1"
   },
   "devDependencies": {
-    "@types/node": "^24.9.2",
+    "@types/node": "^24.10.1",
     "@vercel/ncc": "^0.38.4",
-    "@vitest/coverage-v8": "^4.0.6",
+    "@vitest/coverage-v8": "^4.0.14",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.6",
-    "prettier": "^3.6.2",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.3",
     "typescript": "^5.9.3",
     "vitest": "^4.0.6"
   },
