@@ -1,3 +1,7 @@
+## 3.2.3
+
+maintenance release with updated dependencies
+
 ## 3.2.2
 
 maintenance release with updated dependencies
