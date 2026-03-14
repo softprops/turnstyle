@@ -8,7 +8,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "ncc build src/main.ts --minify",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=cjs --target=node24 --outfile=dist/index.js --minify",
     "typecheck": "tsc --noEmit",
     "test": "vitest --coverage",
     "fmt": "prettier --write 'src/**/*.ts' '__tests__/**/*.ts'",
@@ -30,6 +30,7 @@
     "@octokit/rest": "^22.0.1"
   },
   "devDependencies": {
+    "esbuild": "^0.27.3",
     "@types/node": "^24.11.0",
     "@vercel/ncc": "^0.38.4",
     "@vitest/coverage-v8": "^4.0.18",
