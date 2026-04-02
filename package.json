@@ -30,14 +30,14 @@
     "@octokit/rest": "^22.0.1"
   },
   "devDependencies": {
-    "esbuild": "^0.27.3",
-    "@types/node": "^24.11.0",
+    "esbuild": "^0.27.5",
+    "@types/node": "^24.12.0",
     "@vercel/ncc": "^0.38.4",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.3.1",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.8.1",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "vitest": "^4.0.6"
   },
   "lint-staged": {
