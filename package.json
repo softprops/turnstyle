@@ -25,18 +25,18 @@
   "author": "softprops",
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^3.0.0",
+    "@actions/core": "^3.0.1",
     "@octokit/plugin-throttling": "^11.0.3",
     "@octokit/rest": "^22.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
-    "@vitest/coverage-v8": "^4.1.2",
+    "@vitest/coverage-v8": "^4.1.5",
     "esbuild": "^0.28.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.1",
-    "typescript": "^6.0.2",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.0.6"
   },
   "lint-staged": {
