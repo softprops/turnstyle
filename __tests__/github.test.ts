@@ -18,6 +18,7 @@ const run = (overrides: Partial<WorkflowRun>): WorkflowRun =>
 
 const clientWithRunPages = (pages: WorkflowRun[][]) => {
   const client = new OctokitGitHub('fake-token');
+  let pagesScanned = 0;
   const paginate = vi.fn(async (_endpoint, _options, mapFunction) => {
     const results: WorkflowRun[] = [];
     let doneCalled = false;
@@ -26,6 +27,7 @@ const clientWithRunPages = (pages: WorkflowRun[][]) => {
     };
 
     for (const page of pages) {
+      pagesScanned += 1;
       results.push(...mapFunction({ data: page }, done));
       if (doneCalled) {
         break;
@@ -42,7 +44,7 @@ const clientWithRunPages = (pages: WorkflowRun[][]) => {
     paginate,
   };
 
-  return { client, paginate };
+  return { client, paginate, pagesScanned: () => pagesScanned };
 };
 
 describe('github', () => {
@@ -115,6 +117,22 @@ describe('github', () => {
       await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
         masterRun,
       ]);
+    });
+
+    it('stops pagination when no eligible active runs are found', async () => {
+      const completedPages = Array.from({ length: 51 }, (_, pageIndex) =>
+        Array.from({ length: 100 }, (_, runIndex) =>
+          run({
+            id: pageIndex * 100 + runIndex + 1,
+            status: 'completed',
+            conclusion: 'success',
+          }),
+        ),
+      );
+      const { client, pagesScanned } = clientWithRunPages(completedPages);
+
+      await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([]);
+      expect(pagesScanned()).toBe(50);
     });
   });
 });

@@ -5,6 +5,7 @@ import { Endpoints } from '@octokit/types';
 
 const ThrottledOctokit = Octokit.plugin(throttling);
 const MAX_ELIGIBLE_WORKFLOW_RUNS = 500;
+const MAX_WORKFLOW_RUN_PAGES = 50;
 const ACTIVE_RUN_STATUSES = new Set(['in_progress', 'queued', 'waiting']);
 
 export type WorkflowRun =
@@ -91,13 +92,15 @@ export class OctokitGitHub {
       };
 
     let eligibleRuns = 0;
+    let pagesScanned = 0;
     const runs = await this.octokit.paginate(
       this.octokit.actions.listWorkflowRuns,
       options,
       (response, done) => {
+        pagesScanned += 1;
         const filteredRuns = response.data.filter((run) => matchesWorkflowRunFilters(run, filters));
         eligibleRuns += filteredRuns.length;
-        if (eligibleRuns >= MAX_ELIGIBLE_WORKFLOW_RUNS) {
+        if (eligibleRuns >= MAX_ELIGIBLE_WORKFLOW_RUNS || pagesScanned >= MAX_WORKFLOW_RUN_PAGES) {
           done();
         }
         return filteredRuns;
