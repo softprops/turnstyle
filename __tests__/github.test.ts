@@ -16,10 +16,15 @@ const run = (overrides: Partial<WorkflowRun>): WorkflowRun =>
     ...overrides,
   }) as WorkflowRun;
 
-const clientWithRunPages = (pages: WorkflowRun[][]) => {
+type WorkflowRunPages = WorkflowRun[][];
+
+const clientWithRunPages = (...pagesByCall: WorkflowRunPages[]) => {
   const client = new OctokitGitHub('fake-token');
+  let paginateCalls = 0;
   let pagesScanned = 0;
   const paginate = vi.fn(async (_endpoint, _options, mapFunction) => {
+    const pages = pagesByCall[paginateCalls] || [];
+    paginateCalls += 1;
     const results: WorkflowRun[] = [];
     let doneCalled = false;
     const done = () => {
@@ -70,7 +75,6 @@ describe('github', () => {
       await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
         activeRun,
       ]);
-      expect(paginate).toHaveBeenCalledTimes(1);
     });
 
     it('does not stop pagination after newer active runs outside the queue', async () => {
@@ -112,26 +116,56 @@ describe('github', () => {
         conclusion: null,
         head_branch: 'master',
       });
-      const { client } = clientWithRunPages([[unknownBranchRun, masterRun]]);
+      const { client } = clientWithRunPages([[unknownBranchRun, masterRun]], [], [], []);
 
       await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
         masterRun,
       ]);
     });
 
-    it('passes branch filters to workflow run pagination', async () => {
+    it('splits branch discovery into unfiltered and active branch queries', async () => {
       const activeRun = run({
         id: 1,
         status: 'queued',
         conclusion: null,
         head_branch: 'master',
       });
-      const { client, paginate } = clientWithRunPages([[activeRun]]);
+      const { client, paginate } = clientWithRunPages([], [], [[activeRun]], []);
 
       await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
         activeRun,
       ]);
-      expect(paginate.mock.calls[0][1]).toMatchObject({ branch: 'master' });
+      expect(paginate.mock.calls[0][1]).not.toHaveProperty('branch');
+      expect(paginate.mock.calls[0][1]).not.toHaveProperty('status');
+      expect(paginate.mock.calls.slice(1).map(([, options]) => options)).toEqual([
+        expect.objectContaining({ branch: 'master', status: 'in_progress' }),
+        expect.objectContaining({ branch: 'master', status: 'queued' }),
+        expect.objectContaining({ branch: 'master', status: 'waiting' }),
+      ]);
+    });
+
+    it('finds branch active runs after the unfiltered page cap', async () => {
+      const completedPages = Array.from({ length: 50 }, (_, pageIndex) =>
+        Array.from({ length: 100 }, (_, runIndex) =>
+          run({
+            id: pageIndex * 100 + runIndex + 1,
+            status: 'completed',
+            conclusion: 'success',
+            head_branch: 'feature',
+          }),
+        ),
+      );
+      const activeRun = run({
+        id: 5001,
+        status: 'queued',
+        conclusion: null,
+        head_branch: 'master',
+      });
+      const { client } = clientWithRunPages(completedPages, [], [[activeRun]], []);
+
+      await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
+        activeRun,
+      ]);
     });
 
     it('stops pagination when no eligible active runs are found', async () => {
@@ -144,7 +178,7 @@ describe('github', () => {
           }),
         ),
       );
-      const { client, pagesScanned } = clientWithRunPages(completedPages);
+      const { client, pagesScanned } = clientWithRunPages(completedPages, [], [], []);
 
       await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([]);
       expect(pagesScanned()).toBe(50);

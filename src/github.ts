@@ -6,7 +6,8 @@ import { Endpoints } from '@octokit/types';
 const ThrottledOctokit = Octokit.plugin(throttling);
 const MAX_ELIGIBLE_WORKFLOW_RUNS = 500;
 const MAX_WORKFLOW_RUN_PAGES = 50;
-const ACTIVE_RUN_STATUSES = new Set(['in_progress', 'queued', 'waiting']);
+const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'] as const;
+const ACTIVE_RUN_STATUS_SET = new Set<string>(ACTIVE_RUN_STATUSES);
 
 export type WorkflowRun =
   Endpoints['GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs']['response']['data']['workflow_runs'][number];
@@ -17,7 +18,7 @@ export interface WorkflowRunFilters {
 }
 
 const matchesWorkflowRunFilters = (run: WorkflowRun, filters: WorkflowRunFilters) => {
-  if (!ACTIVE_RUN_STATUSES.has(run.status || '')) {
+  if (!ACTIVE_RUN_STATUS_SET.has(run.status || '')) {
     return false;
   }
 
@@ -83,31 +84,59 @@ export class OctokitGitHub {
     workflow_id: number,
     filters: WorkflowRunFilters = {},
   ): Promise<WorkflowRun[]> => {
-    const options: Endpoints['GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs']['parameters'] =
-      {
-        branch: filters.branch,
-        owner,
-        repo,
-        workflow_id,
-        per_page: 100,
-      };
+    type ListWorkflowRunsOptions =
+      Endpoints['GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs']['parameters'];
+    const baseOptions: ListWorkflowRunsOptions = {
+      owner,
+      repo,
+      workflow_id,
+      per_page: 100,
+    };
 
-    let eligibleRuns = 0;
-    let pagesScanned = 0;
-    const runs = await this.octokit.paginate(
-      this.octokit.actions.listWorkflowRuns,
-      options,
-      (response, done) => {
-        pagesScanned += 1;
-        const filteredRuns = response.data.filter((run) => matchesWorkflowRunFilters(run, filters));
-        eligibleRuns += filteredRuns.length;
-        if (eligibleRuns >= MAX_ELIGIBLE_WORKFLOW_RUNS || pagesScanned >= MAX_WORKFLOW_RUN_PAGES) {
-          done();
-        }
-        return filteredRuns;
-      },
-    );
-    return runs.slice(0, MAX_ELIGIBLE_WORKFLOW_RUNS);
+    const listRuns = async (options: ListWorkflowRunsOptions) => {
+      let eligibleRuns = 0;
+      let pagesScanned = 0;
+      const runs = await this.octokit.paginate(
+        this.octokit.actions.listWorkflowRuns,
+        options,
+        (response, done) => {
+          pagesScanned += 1;
+          const filteredRuns = response.data.filter((run) =>
+            matchesWorkflowRunFilters(run, filters),
+          );
+          eligibleRuns += filteredRuns.length;
+          if (
+            eligibleRuns >= MAX_ELIGIBLE_WORKFLOW_RUNS ||
+            pagesScanned >= MAX_WORKFLOW_RUN_PAGES
+          ) {
+            done();
+          }
+          return filteredRuns;
+        },
+      );
+      return runs.slice(0, MAX_ELIGIBLE_WORKFLOW_RUNS);
+    };
+
+    // Combine unfiltered discovery for stale status-filter safety with active branch queries so
+    // completed branch history cannot consume GitHub's branch search cap.
+    const unfilteredRuns = await listRuns(baseOptions);
+    const statusFilteredRuns = filters.branch
+      ? await Promise.all(
+          ACTIVE_RUN_STATUSES.map((status) =>
+            listRuns({
+              ...baseOptions,
+              branch: filters.branch,
+              status,
+            }),
+          ),
+        )
+      : [];
+
+    const runsById = new Map<number, WorkflowRun>();
+    for (const run of [unfilteredRuns, ...statusFilteredRuns].flat()) {
+      runsById.set(run.id, run);
+    }
+    return [...runsById.values()].slice(0, MAX_ELIGIBLE_WORKFLOW_RUNS);
   };
 
   jobs = async (owner: string, repo: string, run_id: number) => {
