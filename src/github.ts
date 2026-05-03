@@ -85,6 +85,7 @@ export class OctokitGitHub {
   ): Promise<WorkflowRun[]> => {
     const options: Endpoints['GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs']['parameters'] =
       {
+        branch: filters.branch,
         owner,
         repo,
         workflow_id,

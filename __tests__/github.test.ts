@@ -119,6 +119,21 @@ describe('github', () => {
       ]);
     });
 
+    it('passes branch filters to workflow run pagination', async () => {
+      const activeRun = run({
+        id: 1,
+        status: 'queued',
+        conclusion: null,
+        head_branch: 'master',
+      });
+      const { client, paginate } = clientWithRunPages([[activeRun]]);
+
+      await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
+        activeRun,
+      ]);
+      expect(paginate.mock.calls[0][1]).toMatchObject({ branch: 'master' });
+    });
+
     it('stops pagination when no eligible active runs are found', async () => {
       const completedPages = Array.from({ length: 51 }, (_, pageIndex) =>
         Array.from({ length: 100 }, (_, runIndex) =>
