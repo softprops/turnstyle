@@ -401,6 +401,53 @@ describe('wait', () => {
         expect(messages).toEqual([]);
       });
 
+      it('will wait for a lower-id first-attempt run that starts after the current run', async () => {
+        input.runId = 2;
+        input.runAttempt = 1;
+
+        const currentRun = {
+          id: 2,
+          run_attempt: 1,
+          status: 'in_progress',
+          html_url: 'current-run',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:00:00Z',
+          created_at: '2026-05-03T10:00:00Z',
+        };
+        const lowerIdActiveRun = {
+          id: 1,
+          status: 'in_progress',
+          html_url: 'lower-id-active-run',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:01:00Z',
+          created_at: '2026-05-03T10:01:00Z',
+        };
+
+        const githubClient = {
+          runs: vi
+            .fn()
+            .mockResolvedValueOnce([currentRun, lowerIdActiveRun])
+            .mockResolvedValue([currentRun]),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+
+        await waiter.wait();
+
+        expect(messages[0]).toBe('✋Awaiting run lower-id-active-run ...');
+      });
+
       it('filters active runs and branches client-side', async () => {
         input.runId = 5;
         input.sameBranchOnly = true;

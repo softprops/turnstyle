@@ -27,12 +27,12 @@ const findCurrentRun = (runs: WorkflowRun[], input: Input) =>
   runs.find((run) => run.id === input.runId);
 
 const isPreviousRun = (run: WorkflowRun, input: Input, currentRunStartedAt: number | undefined) => {
-  if (currentRunStartedAt === undefined) {
-    return run.id < input.runId;
-  }
-
   if (run.id === input.runId) {
     return false;
+  }
+
+  if (input.runAttempt <= 1 || currentRunStartedAt === undefined) {
+    return run.id < input.runId;
   }
 
   const startedAt = runTimestamp(run);
