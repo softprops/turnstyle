@@ -117,20 +117,18 @@ export class OctokitGitHub {
       return runs.slice(0, MAX_ELIGIBLE_WORKFLOW_RUNS);
     };
 
-    // Combine unfiltered discovery for stale status-filter safety with active branch queries so
-    // completed branch history cannot consume GitHub's branch search cap.
+    // Combine unfiltered discovery for stale status-filter safety with active status queries so
+    // completed history cannot consume GitHub's search caps.
     const unfilteredRuns = await listRuns(baseOptions);
-    const statusFilteredRuns = filters.branch
-      ? await Promise.all(
-          ACTIVE_RUN_STATUSES.map((status) =>
-            listRuns({
-              ...baseOptions,
-              branch: filters.branch,
-              status,
-            }),
-          ),
-        )
-      : [];
+    const statusFilteredRuns = await Promise.all(
+      ACTIVE_RUN_STATUSES.map((status) =>
+        listRuns({
+          ...baseOptions,
+          ...(filters.branch ? { branch: filters.branch } : {}),
+          status,
+        }),
+      ),
+    );
 
     const runsById = new Map<number, WorkflowRun>();
     for (const run of [unfilteredRuns, ...statusFilteredRuns].flat()) {

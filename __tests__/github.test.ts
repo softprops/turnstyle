@@ -168,6 +168,27 @@ describe('github', () => {
       ]);
     });
 
+    it('keeps active status queries when no branch filter is provided', async () => {
+      const activeRun = run({
+        id: 1,
+        status: 'queued',
+        conclusion: null,
+        head_branch: 'feature',
+      });
+      const { client, paginate } = clientWithRunPages([], [], [[activeRun]], []);
+
+      await expect(client.runs('org', 'repo', 123)).resolves.toEqual([activeRun]);
+      const statusOptions = paginate.mock.calls.slice(1).map(([, options]) => options);
+      expect(statusOptions.map((options) => options.status)).toEqual([
+        'in_progress',
+        'queued',
+        'waiting',
+      ]);
+      for (const options of statusOptions) {
+        expect(options).not.toHaveProperty('branch');
+      }
+    });
+
     it('stops pagination when no eligible active runs are found', async () => {
       const completedPages = Array.from({ length: 51 }, (_, pageIndex) =>
         Array.from({ length: 100 }, (_, runIndex) =>
