@@ -66,6 +66,29 @@ describe('wait', () => {
         ]);
       });
 
+      it('will continue immediately when continue-after-seconds is zero', async () => {
+        input.continueAfterSeconds = 0;
+        const githubClient = {
+          runs: vi.fn(),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+        assert.equal(await waiter.wait(), 0);
+        expect(githubClient.runs).not.toHaveBeenCalled();
+        assert.deepEqual(messages, ['🤙Exceeded wait seconds. Continuing...']);
+      });
+
       it('will abort after a prescribed number of seconds', async () => {
         input.abortAfterSeconds = 1;
         const inProgressRun = {
@@ -99,6 +122,32 @@ describe('wait', () => {
           message: 'Aborted after waiting 1 seconds',
         });
         assert.deepEqual(messages, ['✋Awaiting run  ...', '🛑Exceeded wait seconds. Aborting...']);
+      });
+
+      it('will abort immediately when abort-after-seconds is zero', async () => {
+        input.abortAfterSeconds = 0;
+        const githubClient = {
+          runs: vi.fn(),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+        await expect(waiter.wait()).rejects.toMatchObject({
+          name: 'Error',
+          message: 'Aborted after waiting 0 seconds',
+        });
+        expect(githubClient.runs).not.toHaveBeenCalled();
+        assert.deepEqual(messages, ['🛑Exceeded wait seconds. Aborting...']);
       });
 
       it('will return when a run is completed', async () => {

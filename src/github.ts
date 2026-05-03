@@ -1,27 +1,30 @@
 import { debug, warning } from '@actions/core';
+import { throttling } from '@octokit/plugin-throttling';
 import { Octokit } from '@octokit/rest';
 import { Endpoints } from '@octokit/types';
 
+const ThrottledOctokit = Octokit.plugin(throttling);
+
 export class OctokitGitHub {
-  private readonly octokit: Octokit;
+  private readonly octokit: InstanceType<typeof ThrottledOctokit>;
+
   constructor(githubToken: string) {
-    Octokit.plugin(require('@octokit/plugin-throttling'));
-    this.octokit = new Octokit({
+    this.octokit = new ThrottledOctokit({
       baseUrl: process.env['GITHUB_API_URL'] || 'https://api.github.com',
       auth: githubToken,
       throttle: {
-        onRateLimit: (retryAfter, options) => {
+        onRateLimit: (retryAfter, options, octokit, retryCount) => {
           warning(`Request quota exhausted for request ${options.method} ${options.url}`);
 
-          if (options.request.retryCount === 0) {
+          if (retryCount < 1) {
             // only retries once
             debug(`Retrying after ${retryAfter} seconds!`);
             return true;
           }
         },
-        onAbuseLimit: (retryAfter, options) => {
+        onSecondaryRateLimit: (retryAfter, options) => {
           // does not retry, only logs a warning
-          debug(`Abuse detected for request ${options.method} ${options.url}`);
+          debug(`Secondary rate limit detected for request ${options.method} ${options.url}`);
         },
       },
     });

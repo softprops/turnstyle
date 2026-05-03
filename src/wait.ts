@@ -31,16 +31,24 @@ export class Waiter implements Wait {
   }
 
   wait = async (secondsSoFar?: number) => {
-    if (this.input.continueAfterSeconds && (secondsSoFar || 0) >= this.input.continueAfterSeconds) {
+    const elapsedSeconds = secondsSoFar || 0;
+
+    if (
+      this.input.continueAfterSeconds !== undefined &&
+      elapsedSeconds >= this.input.continueAfterSeconds
+    ) {
       this.info(`🤙Exceeded wait seconds. Continuing...`);
       setOutput('force_continued', '1');
-      return secondsSoFar || 0;
+      return elapsedSeconds;
     }
 
-    if (this.input.abortAfterSeconds && (secondsSoFar || 0) >= this.input.abortAfterSeconds) {
+    if (
+      this.input.abortAfterSeconds !== undefined &&
+      elapsedSeconds >= this.input.abortAfterSeconds
+    ) {
       this.info(`🛑Exceeded wait seconds. Aborting...`);
       setOutput('force_continued', '');
-      throw new Error(`Aborted after waiting ${secondsSoFar} seconds`);
+      throw new Error(`Aborted after waiting ${elapsedSeconds} seconds`);
     }
 
     this.debug(`Fetching workflow runs for workflow ID: ${this.workflowId}`);
@@ -115,15 +123,12 @@ export class Waiter implements Wait {
       .sort((a, b) => b.id - a.id);
     if (!previousRuns || !previousRuns.length) {
       setOutput('force_continued', '');
-      if (
-        this.input.initialWaitSeconds > 0 &&
-        (secondsSoFar || 0) < this.input.initialWaitSeconds
-      ) {
+      if (this.input.initialWaitSeconds > 0 && elapsedSeconds < this.input.initialWaitSeconds) {
         this.info(
           `🔎 Waiting for ${this.input.initialWaitSeconds} seconds before checking for runs again...`,
         );
         await new Promise((resolve) => setTimeout(resolve, this.input.initialWaitSeconds * 1000));
-        return this.wait((secondsSoFar || 0) + this.input.initialWaitSeconds);
+        return this.wait(elapsedSeconds + this.input.initialWaitSeconds);
       }
       return;
     } else {
