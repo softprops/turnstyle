@@ -27,6 +27,7 @@ describe('input', () => {
           workflowName: 'test',
           workflowPath: undefined,
           runId: 1,
+          runAttempt: 1,
           continueAfterSeconds: 10,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 5,
@@ -60,6 +61,7 @@ describe('input', () => {
           workflowName: 'test',
           workflowPath: undefined,
           runId: 1,
+          runAttempt: 1,
           continueAfterSeconds: undefined,
           abortAfterSeconds: 10,
           pollIntervalSeconds: 5,
@@ -177,6 +179,7 @@ describe('input', () => {
           workflowName: 'test',
           workflowPath: undefined,
           runId: 1,
+          runAttempt: 1,
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
@@ -207,6 +210,7 @@ describe('input', () => {
           workflowName: 'test',
           workflowPath: undefined,
           runId: 1,
+          runAttempt: 1,
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 60,
@@ -284,6 +288,7 @@ describe('input', () => {
           workflowName: 'test',
           workflowPath: undefined,
           runId: 1,
+          runAttempt: 1,
           continueAfterSeconds: 10,
           abortAfterSeconds: undefined,
           pollIntervalSeconds: 5,
@@ -293,6 +298,20 @@ describe('input', () => {
           initialWaitSeconds: 5,
           queueName: 'queue-name',
         },
+      );
+    });
+
+    it('parses run attempt from GITHUB_RUN_ATTEMPT', () => {
+      assert.equal(
+        parseInput({
+          GITHUB_REF: 'refs/heads/foo',
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW: 'test',
+          GITHUB_RUN_ID: '1',
+          GITHUB_RUN_ATTEMPT: '3',
+          INPUT_TOKEN: 's3cr3t',
+        }).runAttempt,
+        3,
       );
     });
   });

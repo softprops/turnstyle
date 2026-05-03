@@ -4,6 +4,10 @@ import { Octokit } from '@octokit/rest';
 import { Endpoints } from '@octokit/types';
 
 const ThrottledOctokit = Octokit.plugin(throttling);
+const MAX_WORKFLOW_RUNS = 500;
+
+export type WorkflowRun =
+  Endpoints['GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs']['response']['data']['workflow_runs'][number];
 
 export class OctokitGitHub {
   private readonly octokit: InstanceType<typeof ThrottledOctokit>;
@@ -37,7 +41,7 @@ export class OctokitGitHub {
       per_page: 100,
     });
 
-  runs = async (owner: string, repo: string, branch: string | undefined, workflow_id: number) => {
+  runs = async (owner: string, repo: string, workflow_id: number): Promise<WorkflowRun[]> => {
     const options: Endpoints['GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs']['parameters'] =
       {
         owner,
@@ -46,41 +50,19 @@ export class OctokitGitHub {
         per_page: 100,
       };
 
-    if (branch) {
-      options.branch = branch;
-    }
-
-    const in_progress_options = {
-      ...options,
-      status: 'in_progress' as const,
-    };
-    const queued_options = {
-      ...options,
-      status: 'queued' as const,
-    };
-    const waiting_options = {
-      ...options,
-      status: 'waiting' as const,
-    };
-
-    const in_progress_runs = this.octokit.paginate(
+    let fetchedRuns = 0;
+    const runs = await this.octokit.paginate(
       this.octokit.actions.listWorkflowRuns,
-      in_progress_options,
+      options,
+      (response, done) => {
+        fetchedRuns += response.data.length;
+        if (fetchedRuns >= MAX_WORKFLOW_RUNS) {
+          done();
+        }
+        return response.data;
+      },
     );
-
-    const queued_runs = this.octokit.paginate(
-      this.octokit.actions.listWorkflowRuns,
-      queued_options,
-    );
-
-    const waiting_runs = this.octokit.paginate(
-      this.octokit.actions.listWorkflowRuns,
-      waiting_options,
-    );
-
-    return Promise.all([in_progress_runs, queued_runs, waiting_runs]).then((values) =>
-      values.flat(),
-    );
+    return runs.slice(0, MAX_WORKFLOW_RUNS);
   };
 
   jobs = async (owner: string, repo: string, run_id: number) => {

@@ -10,7 +10,7 @@
 
 <div align="center">
   <a href="https://github.com/softprops/turnstyle/actions">
-		<img src="https://github.com/softprops/turnstyle/workflows/Main/badge.svg"/>
+		<img src="https://github.com/softprops/turnstyle/workflows/main/badge.svg"/>
 	</a>
 </div>
 
@@ -169,7 +169,7 @@ jobs:
 | `same-branch-only`       | boolean | Only wait on other runs from the same branch (defaults to true)                                                                        |
 | `initial-wait-seconds`   | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt |
 | `job-to-wait-for`        | string  | Name of the workflow's job to wait for (unbound by default).                                                                           |
-| `step-to-wait-for`       | string  | Name of the step to wait for (unbound by default). Required if job-to-wait-for is set.                                                 |
+| `step-to-wait-for`       | string  | Name of the step to wait for (unbound by default). Requires job-to-wait-for to be set.                                                 |
 | `queue-name`             | string  | Custom substring used to group matching runs across workflows (defaults to the current workflow only).                                 |
 
 #### outputs

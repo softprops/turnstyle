@@ -1,6 +1,60 @@
 import { setOutput } from '@actions/core';
-import { OctokitGitHub as GitHub } from './github';
+import { OctokitGitHub as GitHub, WorkflowRun } from './github';
 import { Input } from './input';
+
+const ACTIVE_RUN_STATUSES = new Set(['in_progress', 'queued', 'waiting']);
+
+const runTimestamp = (run: WorkflowRun): number | undefined => {
+  const value = run.run_started_at || run.created_at;
+  if (!value) {
+    return undefined;
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? undefined : timestamp;
+};
+
+const isActiveRun = (run: WorkflowRun) => ACTIVE_RUN_STATUSES.has(run.status || '');
+
+const isRunOnSameBranch = (run: WorkflowRun, input: Input) =>
+  !input.sameBranchOnly || !run.head_branch || run.head_branch === input.branch;
+
+const filterEligibleRuns = (runs: WorkflowRun[], input: Input) =>
+  runs.filter(isActiveRun).filter((run) => isRunOnSameBranch(run, input));
+
+const findCurrentRun = (runs: WorkflowRun[], input: Input) =>
+  runs.find((run) => run.id === input.runId && run.run_attempt === input.runAttempt) ||
+  runs.find((run) => run.id === input.runId);
+
+const isPreviousRun = (run: WorkflowRun, input: Input, currentRunStartedAt: number | undefined) => {
+  if (currentRunStartedAt === undefined) {
+    return run.id < input.runId;
+  }
+
+  if (run.id === input.runId) {
+    return false;
+  }
+
+  const startedAt = runTimestamp(run);
+  if (startedAt === undefined) {
+    return run.id < input.runId;
+  }
+
+  return (
+    startedAt < currentRunStartedAt || (startedAt === currentRunStartedAt && run.id < input.runId)
+  );
+};
+
+const compareRunsNewestFirst = (a: WorkflowRun, b: WorkflowRun) => {
+  const aTimestamp = runTimestamp(a);
+  const bTimestamp = runTimestamp(b);
+
+  if (aTimestamp !== undefined && bTimestamp !== undefined && aTimestamp !== bTimestamp) {
+    return bTimestamp - aTimestamp;
+  }
+
+  return b.id - a.id;
+};
 
 export interface Wait {
   wait(secondsSoFar?: number): Promise<number>;
@@ -52,35 +106,26 @@ export class Waiter implements Wait {
     }
 
     this.debug(`Fetching workflow runs for workflow ID: ${this.workflowId}`);
-    const runs = await this.githubClient.runs(
-      this.input.owner,
-      this.input.repo,
-      this.input.sameBranchOnly ? this.input.branch : undefined,
-      this.workflowId,
-    );
+    const runs = await this.githubClient.runs(this.input.owner, this.input.repo, this.workflowId);
 
     this.debug(`Found ${runs.length} ${this.workflowId} runs`);
 
     const queueName = this.input.queueName;
-    let filteredRuns = runs;
+    let currentRun = findCurrentRun(runs, this.input);
+    let filteredRuns = filterEligibleRuns(runs, this.input);
     const allWorkflowsSize = this.allWorkflows.length;
 
     if (queueName && allWorkflowsSize > 0) {
       this.debug(`Searching across ${allWorkflowsSize} workflows for queue name: ${queueName}`);
       const BATCH_SIZE = 10;
-      const allRuns: any[] = [];
+      const allRuns: WorkflowRun[] = [];
       for (let i = 0; i < allWorkflowsSize; i += BATCH_SIZE) {
         const batch = this.allWorkflows.slice(i, i + BATCH_SIZE);
         this.debug(
           `Processing workflow batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allWorkflowsSize / BATCH_SIZE)}`,
         );
         const getRunsPromises = batch.map((workflow) =>
-          this.githubClient.runs(
-            this.input.owner,
-            this.input.repo,
-            this.input.sameBranchOnly ? this.input.branch : undefined,
-            workflow.id,
-          ),
+          this.githubClient.runs(this.input.owner, this.input.repo, workflow.id),
         );
         const batchResults = await Promise.allSettled(getRunsPromises);
         batchResults.forEach((result, index) => {
@@ -93,7 +138,8 @@ export class Waiter implements Wait {
         });
       }
 
-      filteredRuns = allRuns.filter((run) => {
+      currentRun = currentRun || findCurrentRun(allRuns, this.input);
+      filteredRuns = filterEligibleRuns(allRuns, this.input).filter((run) => {
         const matchesQueue =
           run.display_title?.includes(queueName) || run.name?.includes(queueName);
         if (matchesQueue) {
@@ -107,8 +153,20 @@ export class Waiter implements Wait {
       this.debug(`After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`);
     }
 
+    const currentRunStartedAt = currentRun ? runTimestamp(currentRun) : undefined;
+    if (currentRunStartedAt !== undefined) {
+      this.debug(
+        'Found current run ' +
+          this.input.runId +
+          ' attempt ' +
+          this.input.runAttempt +
+          ' at ' +
+          new Date(currentRunStartedAt).toISOString(),
+      );
+    }
+
     const previousRuns = filteredRuns
-      .filter((run) => run.id < this.input.runId)
+      .filter((run) => isPreviousRun(run, this.input, currentRunStartedAt))
       .filter((run) => {
         const isSuccessful: boolean = run.conclusion === 'success';
 
@@ -120,7 +178,7 @@ export class Waiter implements Wait {
 
         return !isSuccessful;
       })
-      .sort((a, b) => b.id - a.id);
+      .sort(compareRunsNewestFirst);
     if (!previousRuns || !previousRuns.length) {
       setOutput('force_continued', '');
       if (this.input.initialWaitSeconds > 0 && elapsedSeconds < this.input.initialWaitSeconds) {
