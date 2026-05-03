@@ -27,6 +27,8 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Check bundled action
+        run: git diff --exit-code -- dist/index.js
       - name: Test
         run: npm run test
       - name: Format

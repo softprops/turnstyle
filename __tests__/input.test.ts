@@ -25,6 +25,7 @@ describe('input', () => {
           repo: 'turnstyle',
           branch: 'foo',
           workflowName: 'test',
+          workflowPath: undefined,
           runId: 1,
           continueAfterSeconds: 10,
           abortAfterSeconds: undefined,
@@ -57,6 +58,7 @@ describe('input', () => {
           repo: 'turnstyle',
           branch: 'foo',
           workflowName: 'test',
+          workflowPath: undefined,
           runId: 1,
           continueAfterSeconds: undefined,
           abortAfterSeconds: 10,
@@ -173,6 +175,7 @@ describe('input', () => {
           repo: 'turnstyle',
           branch: 'foo',
           workflowName: 'test',
+          workflowPath: undefined,
           runId: 1,
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
@@ -202,6 +205,7 @@ describe('input', () => {
           repo: 'turnstyle',
           branch: 'pr-branch-name',
           workflowName: 'test',
+          workflowPath: undefined,
           runId: 1,
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
@@ -212,6 +216,47 @@ describe('input', () => {
           initialWaitSeconds: 0,
           queueName: undefined,
         },
+      );
+    });
+
+    it('parses branch from GITHUB_REF_NAME when available', () => {
+      assert.equal(
+        parseInput({
+          GITHUB_REF: 'refs/heads/foo',
+          GITHUB_REF_NAME: 'release/branch-name',
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW: 'test',
+          GITHUB_RUN_ID: '1',
+          INPUT_TOKEN: 's3cr3t',
+        }).branch,
+        'release/branch-name',
+      );
+    });
+
+    it('parses tags from GITHUB_REF without truncating the tag name', () => {
+      assert.equal(
+        parseInput({
+          GITHUB_REF: 'refs/tags/v3.2.3',
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW: 'test',
+          GITHUB_RUN_ID: '1',
+          INPUT_TOKEN: 's3cr3t',
+        }).branch,
+        'v3.2.3',
+      );
+    });
+
+    it('parses workflow path from GITHUB_WORKFLOW_REF', () => {
+      assert.equal(
+        parseInput({
+          GITHUB_REF: 'refs/heads/foo',
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW: 'test',
+          GITHUB_WORKFLOW_REF: 'softprops/turnstyle/.github/workflows/main.yml@refs/heads/foo',
+          GITHUB_RUN_ID: '1',
+          INPUT_TOKEN: 's3cr3t',
+        }).workflowPath,
+        '.github/workflows/main.yml',
       );
     });
 
@@ -237,6 +282,7 @@ describe('input', () => {
           repo: 'turnstyle',
           branch: 'foo',
           workflowName: 'test',
+          workflowPath: undefined,
           runId: 1,
           continueAfterSeconds: 10,
           abortAfterSeconds: undefined,
