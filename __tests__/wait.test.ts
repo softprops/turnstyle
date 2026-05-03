@@ -941,7 +941,9 @@ describe('wait', () => {
           expect(hasSearchMessage).toBe(false);
           const hasQueueMessage = debugMessages.some((msg) => msg.includes('matches queue'));
           expect(hasQueueMessage).toBe(false);
-          expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', workflow1.id);
+          expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', workflow1.id, {
+            branch: 'master',
+          });
         });
 
         it('should batch workflow requests to avoid rate limits', async () => {

@@ -106,12 +106,27 @@ export class Waiter implements Wait {
     }
 
     this.debug(`Fetching workflow runs for workflow ID: ${this.workflowId}`);
-    const runs = await this.githubClient.runs(this.input.owner, this.input.repo, this.workflowId);
+    let currentRun: WorkflowRun | undefined;
+    try {
+      currentRun = await this.githubClient.run(this.input.owner, this.input.repo, this.input.runId);
+    } catch (error: any) {
+      this.debug(`Failed to fetch current run ${this.input.runId}: ${error.message}`);
+    }
+
+    const runFilters = {
+      branch: this.input.sameBranchOnly ? this.input.branch : undefined,
+    };
+    const runs = await this.githubClient.runs(
+      this.input.owner,
+      this.input.repo,
+      this.workflowId,
+      runFilters,
+    );
 
     this.debug(`Found ${runs.length} ${this.workflowId} runs`);
 
     const queueName = this.input.queueName;
-    let currentRun = findCurrentRun(runs, this.input);
+    currentRun = currentRun || findCurrentRun(runs, this.input);
     let filteredRuns = filterEligibleRuns(runs, this.input);
     const allWorkflowsSize = this.allWorkflows.length;
 
@@ -125,7 +140,10 @@ export class Waiter implements Wait {
           `Processing workflow batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allWorkflowsSize / BATCH_SIZE)}`,
         );
         const getRunsPromises = batch.map((workflow) =>
-          this.githubClient.runs(this.input.owner, this.input.repo, workflow.id),
+          this.githubClient.runs(this.input.owner, this.input.repo, workflow.id, {
+            ...runFilters,
+            queueName,
+          }),
         );
         const batchResults = await Promise.allSettled(getRunsPromises);
         batchResults.forEach((result, index) => {
