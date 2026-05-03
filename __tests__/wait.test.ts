@@ -624,6 +624,78 @@ describe('wait', () => {
         ]);
       });
 
+      it('will keep checking previous runs after a rerun predecessor job is complete', async () => {
+        input.runId = 3;
+        input.runAttempt = 2;
+        input.jobToWaitFor = 'test-job';
+        input.pollIntervalSeconds = 0;
+
+        const currentRun = {
+          id: 3,
+          run_attempt: 2,
+          status: 'in_progress',
+          html_url: 'current-run',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:05:00Z',
+          created_at: '2026-05-03T10:05:00Z',
+        };
+        const olderRerun = {
+          id: 1,
+          status: 'in_progress',
+          html_url: 'older-rerun',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:04:00Z',
+          created_at: '2026-05-03T10:04:00Z',
+        };
+        const newerPreviousRun = {
+          id: 2,
+          status: 'in_progress',
+          html_url: 'newer-previous-run',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:03:00Z',
+          created_at: '2026-05-03T10:03:00Z',
+        };
+        const completedJob = {
+          id: 1,
+          name: 'test-job',
+          status: 'completed',
+          html_url: 'completed-job-url',
+        };
+        const activeJob = {
+          id: 2,
+          name: 'test-job',
+          status: 'in_progress',
+          html_url: 'active-job-url',
+        };
+
+        const githubClient = {
+          runs: vi
+            .fn()
+            .mockResolvedValueOnce([currentRun, olderRerun, newerPreviousRun])
+            .mockResolvedValue([currentRun]),
+          jobs: vi.fn().mockResolvedValueOnce([completedJob]).mockResolvedValueOnce([activeJob]),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+        await waiter.wait();
+
+        assert.deepEqual(messages, [
+          'Job test-job completed from run older-rerun',
+          '✋Awaiting job run completion from job active-job-url ...',
+        ]);
+      });
+
       it('will wait for a specific step to complete if wait-for-step is defined', async () => {
         input.jobToWaitFor = 'test-job';
         input.stepToWaitFor = 'test-step';
