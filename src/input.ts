@@ -4,6 +4,7 @@ export interface Input {
   repo: string;
   branch: string;
   workflowName: string;
+  workflowPath: string | undefined;
   runId: number;
   pollIntervalSeconds: number;
   continueAfterSeconds: number | undefined;
@@ -39,11 +40,46 @@ const parseSecondsInput = (
   return value;
 };
 
+const parseRefName = (ref: string | undefined): string | undefined => {
+  if (!ref) {
+    return undefined;
+  }
+
+  const prefixes = ['refs/heads/', 'refs/tags/'];
+  const prefix = prefixes.find((candidate) => ref.startsWith(candidate));
+  if (!prefix) {
+    return ref;
+  }
+
+  return ref.substring(prefix.length);
+};
+
+const parseWorkflowPath = (
+  workflowRef: string | undefined,
+  owner: string,
+  repo: string,
+): string | undefined => {
+  if (!workflowRef || !owner || !repo) {
+    return undefined;
+  }
+
+  const workflowRefPath = workflowRef.split('@')[0];
+  const repoPrefix = `${owner}/${repo}/`;
+
+  if (!workflowRefPath.startsWith(repoPrefix)) {
+    return undefined;
+  }
+
+  return workflowRefPath.substring(repoPrefix.length);
+};
+
 export const parseInput = (env: Record<string, string | undefined>): Input => {
   const githubToken = env['INPUT_TOKEN'] || '';
   const [owner, repo] = (env.GITHUB_REPOSITORY || '').split('/');
   const workflowName = env.GITHUB_WORKFLOW || '';
-  const branch = env.GITHUB_HEAD_REF || env.GITHUB_REF?.substring(11) || 'master';
+  const workflowPath = parseWorkflowPath(env.GITHUB_WORKFLOW_REF, owner, repo);
+  const branch =
+    env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME || parseRefName(env.GITHUB_REF) || 'master';
   const runId = parseInt(env.GITHUB_RUN_ID || '0', 10);
   const pollIntervalSeconds = parseSecondsInput(env, 'INPUT_POLL-INTERVAL-SECONDS', 60, 1) ?? 60;
   const continueAfterSeconds = parseSecondsInput(env, 'INPUT_CONTINUE-AFTER-SECONDS', undefined, 0);
@@ -68,6 +104,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     repo,
     branch,
     workflowName,
+    workflowPath,
     runId,
     pollIntervalSeconds,
     continueAfterSeconds,
