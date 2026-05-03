@@ -17,7 +17,7 @@ const runTimestamp = (run: WorkflowRun): number | undefined => {
 const isActiveRun = (run: WorkflowRun) => ACTIVE_RUN_STATUSES.has(run.status || '');
 
 const isRunOnSameBranch = (run: WorkflowRun, input: Input) =>
-  !input.sameBranchOnly || !run.head_branch || run.head_branch === input.branch;
+  !input.sameBranchOnly || run.head_branch === input.branch;
 
 const filterEligibleRuns = (runs: WorkflowRun[], input: Input) =>
   runs.filter(isActiveRun).filter((run) => isRunOnSameBranch(run, input));

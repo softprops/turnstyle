@@ -96,5 +96,25 @@ describe('github', () => {
         client.runs('org', 'repo', 123, { branch: 'master', queueName: 'deploy-api' }),
       ).resolves.toEqual([queuedRun]);
     });
+
+    it('excludes active runs with unknown branches from branch-filtered results', async () => {
+      const unknownBranchRun = run({
+        id: 1,
+        status: 'queued',
+        conclusion: null,
+        head_branch: null,
+      });
+      const masterRun = run({
+        id: 2,
+        status: 'queued',
+        conclusion: null,
+        head_branch: 'master',
+      });
+      const { client } = clientWithRunPages([[unknownBranchRun, masterRun]]);
+
+      await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
+        masterRun,
+      ]);
+    });
   });
 });

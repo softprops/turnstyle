@@ -20,7 +20,7 @@ const matchesWorkflowRunFilters = (run: WorkflowRun, filters: WorkflowRunFilters
     return false;
   }
 
-  if (filters.branch && run.head_branch && run.head_branch !== filters.branch) {
+  if (filters.branch && run.head_branch !== filters.branch) {
     return false;
   }
 

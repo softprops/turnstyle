@@ -25,7 +25,7 @@ describe('wait', () => {
           runAttempt: 1,
           workflowName: workflow.name,
           workflowPath: undefined,
-          sameBranchOnly: true,
+          sameBranchOnly: false,
           jobToWaitFor: undefined,
           stepToWaitFor: undefined,
           initialWaitSeconds: 0,
@@ -403,6 +403,7 @@ describe('wait', () => {
 
       it('filters active runs and branches client-side', async () => {
         input.runId = 5;
+        input.sameBranchOnly = true;
 
         const currentRun = {
           id: 5,
@@ -438,6 +439,14 @@ describe('wait', () => {
           run_started_at: '2026-05-03T10:03:00Z',
           created_at: '2026-05-03T10:03:00Z',
         };
+        const unknownBranchActiveRun = {
+          id: 4,
+          status: 'in_progress',
+          html_url: 'unknown-branch-active-run',
+          head_branch: null,
+          run_started_at: '2026-05-03T10:04:00Z',
+          created_at: '2026-05-03T10:04:00Z',
+        };
 
         const githubClient = {
           runs: vi
@@ -447,6 +456,7 @@ describe('wait', () => {
               sameBranchActiveRun,
               sameBranchCompletedRun,
               otherBranchActiveRun,
+              unknownBranchActiveRun,
             ])
             .mockResolvedValue([currentRun]),
           workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
@@ -698,7 +708,7 @@ describe('wait', () => {
             runAttempt: 1,
             workflowName: workflow1.name,
             workflowPath: undefined,
-            sameBranchOnly: true,
+            sameBranchOnly: false,
             jobToWaitFor: undefined,
             stepToWaitFor: undefined,
             initialWaitSeconds: 0,
@@ -942,7 +952,7 @@ describe('wait', () => {
           const hasQueueMessage = debugMessages.some((msg) => msg.includes('matches queue'));
           expect(hasQueueMessage).toBe(false);
           expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', workflow1.id, {
-            branch: 'master',
+            branch: undefined,
           });
         });
 
