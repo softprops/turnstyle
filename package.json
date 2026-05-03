@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/softprops/diffset.git"
+    "url": "git+https://github.com/softprops/turnstyle.git"
   },
   "keywords": [
     "actions",

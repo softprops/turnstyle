@@ -161,7 +161,8 @@ jobs:
 #### inputs
 
 | Name                     | Type    | Description                                                                                                                            |
-| ------------------------ | ------- |----------------------------------------------------------------------------------------------------------------------------------------|
+| ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`                  | string  | GitHub access token used for Actions API reads (defaults to `github.token`)                                                            |
 | `continue-after-seconds` | number  | Maximum number of seconds to wait before moving forward (unbound by default). Mutually exclusive with abort-after-seconds              |
 | `abort-after-seconds`    | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds         |
 | `poll-interval-seconds`  | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                               |
@@ -169,6 +170,7 @@ jobs:
 | `initial-wait-seconds`   | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt |
 | `job-to-wait-for`        | string  | Name of the workflow's job to wait for (unbound by default).                                                                           |
 | `step-to-wait-for`       | string  | Name of the step to wait for (unbound by default). Required if job-to-wait-for is set.                                                 |
+| `queue-name`             | string  | Custom substring used to group matching runs across workflows (defaults to the current workflow only).                                 |
 
 #### outputs
 
@@ -190,8 +192,8 @@ In the GitHub Actions documentation.
 If you need to specify explicit permissions for the API requests made by this
 action, the permissions required are:
 
-- `actions:read` - this permission is required for the [listWorkflowRunsForRepo](https://octokit.github.io/rest.js/v18#actions-list-workflow-runs-for-repo)
-  API request.
+- `actions:read` - this permission is required for the workflow, run, job, and
+  step read requests made by this action.
 
 ## cost of coordination
 

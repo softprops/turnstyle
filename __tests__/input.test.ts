@@ -85,6 +85,60 @@ describe('input', () => {
       );
     });
 
+    it('parses zero second timeout inputs', () => {
+      const baseEnv = {
+        GITHUB_REF: 'refs/heads/foo',
+        GITHUB_REPOSITORY: 'softprops/turnstyle',
+        GITHUB_WORKFLOW: 'test',
+        GITHUB_RUN_ID: '1',
+        INPUT_TOKEN: 's3cr3t',
+      };
+
+      assert.equal(
+        parseInput({
+          ...baseEnv,
+          'INPUT_CONTINUE-AFTER-SECONDS': '0',
+        }).continueAfterSeconds,
+        0,
+      );
+      assert.equal(
+        parseInput({
+          ...baseEnv,
+          'INPUT_ABORT-AFTER-SECONDS': '0',
+        }).abortAfterSeconds,
+        0,
+      );
+    });
+
+    it('rejects invalid seconds inputs', () => {
+      const baseEnv = {
+        GITHUB_REF: 'refs/heads/foo',
+        GITHUB_REPOSITORY: 'softprops/turnstyle',
+        GITHUB_WORKFLOW: 'test',
+        GITHUB_RUN_ID: '1',
+        INPUT_TOKEN: 's3cr3t',
+      };
+
+      const invalidInputs: Array<[string, string, RegExp]> = [
+        ['INPUT_CONTINUE-AFTER-SECONDS', '-1', /continue-after-seconds/],
+        ['INPUT_ABORT-AFTER-SECONDS', '1.5', /abort-after-seconds/],
+        ['INPUT_INITIAL-WAIT-SECONDS', 'abc', /initial-wait-seconds/],
+        ['INPUT_POLL-INTERVAL-SECONDS', '0', /poll-interval-seconds/],
+        ['INPUT_POLL-INTERVAL-SECONDS', '5s', /poll-interval-seconds/],
+      ];
+
+      invalidInputs.forEach(([inputName, value, expectedMessage]) => {
+        assert.throws(
+          () =>
+            parseInput({
+              ...baseEnv,
+              [inputName]: value,
+            }),
+          expectedMessage,
+        );
+      });
+    });
+
     it('rejects env with stepToWaitFor but no jobToWaitFor', () => {
       assert.throws(() =>
         parseInput({
