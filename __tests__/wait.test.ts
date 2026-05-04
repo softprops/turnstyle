@@ -398,6 +398,62 @@ describe('wait', () => {
         expect(messages[0]).toBe('✋Awaiting run earlier-active-run ...');
       });
 
+      it('will wait for an active run created before a rerun attempt that starts afterward', async () => {
+        input.runId = 1;
+        input.runAttempt = 2;
+        input.pollIntervalSeconds = 0;
+
+        const currentRun = {
+          id: 1,
+          run_attempt: 2,
+          status: 'in_progress',
+          html_url: 'current-run',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:02:00Z',
+          created_at: '2026-05-03T10:02:00Z',
+        };
+        const queuedBeforeRerun = {
+          id: 2,
+          status: 'in_progress',
+          html_url: 'queued-before-rerun',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:03:00Z',
+          created_at: '2026-05-03T10:01:00Z',
+        };
+        const laterActiveRun = {
+          id: 3,
+          status: 'in_progress',
+          html_url: 'later-active-run',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:03:00Z',
+          created_at: '2026-05-03T10:03:00Z',
+        };
+
+        const githubClient = {
+          runs: vi
+            .fn()
+            .mockResolvedValueOnce([currentRun, queuedBeforeRerun, laterActiveRun])
+            .mockResolvedValue([currentRun]),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+
+        await waiter.wait();
+
+        expect(messages[0]).toBe('✋Awaiting run queued-before-rerun ...');
+      });
+
       it('will not wait for a run that starts after the current run', async () => {
         input.runId = 2;
 

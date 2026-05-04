@@ -5,8 +5,7 @@ import { Input } from './input';
 const ACTIVE_RUN_STATUSES = new Set(['in_progress', 'queued', 'waiting']);
 const MAX_PREVIOUS_WORKFLOW_RUNS = 500;
 
-const runTimestamp = (run: WorkflowRun): number | undefined => {
-  const value = run.run_started_at || run.created_at;
+const parseTimestamp = (value: string | null | undefined): number | undefined => {
   if (!value) {
     return undefined;
   }
@@ -14,6 +13,12 @@ const runTimestamp = (run: WorkflowRun): number | undefined => {
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp) ? undefined : timestamp;
 };
+
+const runTimestamp = (run: WorkflowRun): number | undefined =>
+  parseTimestamp(run.run_started_at) || parseTimestamp(run.created_at);
+
+const runCreatedTimestamp = (run: WorkflowRun): number | undefined =>
+  parseTimestamp(run.created_at);
 
 const isActiveRun = (run: WorkflowRun) => ACTIVE_RUN_STATUSES.has(run.status || '');
 
@@ -36,9 +41,18 @@ const isPreviousRun = (run: WorkflowRun, input: Input, currentRunStartedAt: numb
     return run.id < input.runId;
   }
 
+  if (run.id < input.runId) {
+    return true;
+  }
+
+  const createdAt = runCreatedTimestamp(run);
+  if (createdAt !== undefined && createdAt < currentRunStartedAt) {
+    return true;
+  }
+
   const startedAt = runTimestamp(run);
   if (startedAt === undefined) {
-    return run.id < input.runId;
+    return false;
   }
 
   return (
