@@ -121,7 +121,11 @@ export class Waiter implements Wait {
     this.allWorkflows = allWorkflows;
   }
 
-  private setPreviousRunOutput = (run: WorkflowRun | undefined) => {
+  private setPreviousRunOutput = (run: WorkflowRun) => {
+    if (this.previousRunOutput && compareRunsNewestFirst(run, this.previousRunOutput) >= 0) {
+      return;
+    }
+
     this.previousRunOutput = run;
     outputPreviousRun(run);
   };

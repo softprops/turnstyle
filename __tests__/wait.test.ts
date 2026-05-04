@@ -253,6 +253,60 @@ describe('wait', () => {
         assert.deepEqual(messages[messages.length - 1], `✋Awaiting run ${input.runId - 1} ...`);
       });
 
+      it('preserves the newest previous run output while a backlog drains', async () => {
+        input.runId = 3;
+        input.pollIntervalSeconds = 0;
+
+        const olderRun = {
+          id: 1,
+          status: 'in_progress',
+          html_url: 'older-run',
+        };
+        const newestPreviousRun = {
+          id: 2,
+          status: 'in_progress',
+          html_url: 'newest-previous-run',
+        };
+
+        const githubClient = {
+          runs: vi
+            .fn()
+            .mockResolvedValueOnce([olderRun, newestPreviousRun])
+            .mockResolvedValueOnce([olderRun])
+            .mockResolvedValue([]),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+
+        await waiter.wait();
+
+        assert.deepEqual(messages, [
+          '✋Awaiting run newest-previous-run ...',
+          '✋Awaiting run older-run ...',
+        ]);
+        expect(
+          setOutputMock.mock.calls
+            .filter(([name]) => name === 'previous_run_id')
+            .map(([, value]) => value),
+        ).toEqual(['2']);
+        expect(
+          setOutputMock.mock.calls
+            .filter(([name]) => name === 'previous_run_url')
+            .map(([, value]) => value),
+        ).toEqual(['newest-previous-run']);
+      });
+
       it('will wait for an older predecessor behind newer active runs', async () => {
         input.runId = 1000;
         input.pollIntervalSeconds = 0;
