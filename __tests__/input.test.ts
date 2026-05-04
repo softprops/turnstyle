@@ -223,6 +223,37 @@ describe('input', () => {
       );
     });
 
+    it('uses explicit branch input when present', () => {
+      assert.equal(
+        parseInput({
+          GITHUB_HEAD_REF: 'pr-branch-name',
+          GITHUB_REF: 'refs/heads/foo',
+          GITHUB_REF_NAME: 'release/branch-name',
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW: 'test',
+          GITHUB_RUN_ID: '1',
+          INPUT_TOKEN: 's3cr3t',
+          INPUT_BRANCH: 'master',
+        }).branch,
+        'master',
+      );
+    });
+
+    it('falls back to detected branch when branch input is blank', () => {
+      assert.equal(
+        parseInput({
+          GITHUB_REF: 'refs/heads/foo',
+          GITHUB_REF_NAME: 'release/branch-name',
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW: 'test',
+          GITHUB_RUN_ID: '1',
+          INPUT_TOKEN: 's3cr3t',
+          INPUT_BRANCH: '   ',
+        }).branch,
+        'release/branch-name',
+      );
+    });
+
     it('parses branch from GITHUB_REF_NAME when available', () => {
       assert.equal(
         parseInput({

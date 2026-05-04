@@ -84,8 +84,13 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
   const [owner, repo] = (env.GITHUB_REPOSITORY || '').split('/');
   const workflowName = env.GITHUB_WORKFLOW || '';
   const workflowPath = parseWorkflowPath(env.GITHUB_WORKFLOW_REF, owner, repo);
+  const branchInput = env['INPUT_BRANCH']?.trim();
   const branch =
-    env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME || parseRefName(env.GITHUB_REF) || 'master';
+    branchInput ||
+    env.GITHUB_HEAD_REF ||
+    env.GITHUB_REF_NAME ||
+    parseRefName(env.GITHUB_REF) ||
+    'master';
   const runId = parseInt(env.GITHUB_RUN_ID || '0', 10);
   const runAttempt = parseRunAttempt(env.GITHUB_RUN_ATTEMPT);
   const pollIntervalSeconds = parseSecondsInput(env, 'INPUT_POLL-INTERVAL-SECONDS', 60, 1) ?? 60;
