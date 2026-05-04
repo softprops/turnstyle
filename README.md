@@ -158,6 +158,50 @@ jobs:
         run: sleep 30
 ```
 
+### Reusable workflows
+
+Turnstyle can run from a called reusable workflow. If the same caller workflow
+invokes the reusable workflow repeatedly, the default queue is scoped to that
+caller workflow.
+
+If several caller workflows should share one queue through the same reusable
+workflow, set `queue-name` to a stable value and include that value in each
+caller workflow's run name or workflow name. Turnstyle uses that queue name to
+find matching active runs across workflows.
+
+Caller workflow:
+
+```yaml
+name: Deploy API
+run-name: deploy-queue ${{ github.ref_name }} ${{ github.run_number }}
+
+on: push
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/reusable-deploy.yml
+```
+
+Called reusable workflow:
+
+```yaml
+name: Reusable deploy
+
+on:
+  workflow_call:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Turnstyle
+        uses: softprops/turnstyle@v3
+        with:
+          queue-name: deploy-queue
+      - name: Deploy
+        run: sleep 30
+```
+
 #### inputs
 
 | Name                     | Type    | Description                                                                                                                            |
