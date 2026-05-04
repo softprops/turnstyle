@@ -1,3 +1,11 @@
+## Unreleased
+
+### Exciting New Features 🎉
+
+- Document reusable workflow usage and queue naming behavior by @chenrui333 in https://github.com/softprops/turnstyle/pull/143
+- Allow same-branch filtering to target an explicit branch by @chenrui333 in https://github.com/softprops/turnstyle/pull/144
+- Expose previous run ID and URL outputs by @chenrui333 in https://github.com/softprops/turnstyle/pull/145
+
 ## 3.2.4
 
 ### Bug fixes 🐛

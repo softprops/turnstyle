@@ -26,6 +26,10 @@ This can be problematic for workflows used as part of a continuous deployment pr
 
 The typical setup for turnstyle involves adding job step using `softprops/turnstyle@v3`.
 
+The examples below use the moving `v3` major-version tag. If you need a
+change that has merged to `master` but has not been released yet, pin the
+merged commit SHA until the next `v3` release is published.
+
 ```diff
 name: Main
 
