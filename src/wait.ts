@@ -42,19 +42,19 @@ const isPreviousRun = (run: WorkflowRun, input: Input, currentRunStartedAt: numb
     return false;
   }
 
-  if (input.runAttempt <= 1 || currentRunStartedAt === undefined) {
-    return run.id < input.runId;
-  }
-
   if (isRerunAttempt(run)) {
     const startedAt = runStartedTimestamp(run);
-    if (startedAt === undefined) {
+    if (currentRunStartedAt === undefined || startedAt === undefined) {
       return false;
     }
 
     return (
       startedAt < currentRunStartedAt || (startedAt === currentRunStartedAt && run.id < input.runId)
     );
+  }
+
+  if (input.runAttempt <= 1 || currentRunStartedAt === undefined) {
+    return run.id < input.runId;
   }
 
   if (run.id < input.runId) {

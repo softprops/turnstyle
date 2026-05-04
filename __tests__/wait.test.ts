@@ -501,6 +501,52 @@ describe('wait', () => {
         expect(messages).toEqual([]);
       });
 
+      it('will not wait for a lower-id rerun attempt that starts after the current run', async () => {
+        input.runId = 3;
+        input.runAttempt = 1;
+        input.pollIntervalSeconds = 0;
+
+        const currentRun = {
+          id: 3,
+          run_attempt: 1,
+          status: 'in_progress',
+          html_url: 'current-run',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:02:00Z',
+          created_at: '2026-05-03T10:02:00Z',
+        };
+        const laterRerun = {
+          id: 1,
+          run_attempt: 2,
+          status: 'in_progress',
+          html_url: 'later-rerun',
+          head_branch: 'master',
+          run_started_at: '2026-05-03T10:03:00Z',
+          created_at: '2026-05-03T10:00:00Z',
+        };
+
+        const githubClient = {
+          runs: vi.fn().mockResolvedValue([currentRun, laterRerun]),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+
+        await waiter.wait();
+
+        expect(messages).toEqual([]);
+      });
+
       it('will not wait for a run that starts after the current run', async () => {
         input.runId = 2;
 
