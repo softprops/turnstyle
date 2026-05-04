@@ -180,6 +180,32 @@ jobs:
         run: sleep 30
 ```
 
+You can use `previous_run_id` to download artifacts from the run Turnstyle
+waited on.
+
+```yaml
+name: Main
+
+on: push
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Turnstyle
+        id: turnstyle
+        uses: softprops/turnstyle@v3
+      - name: Download previous artifact
+        if: steps.turnstyle.outputs.previous_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.turnstyle.outputs.previous_run_id }}
+```
+
 ### Reusable workflows
 
 Turnstyle can run from a called reusable workflow. If the same caller workflow
@@ -241,9 +267,11 @@ jobs:
 
 #### outputs
 
-| Name              | Type    | Description                                                                                     |
-| ----------------- | ------- | ----------------------------------------------------------------------------------------------- |
-| `force_continued` | boolean | True if continue-after-seconds is used and the step using turnstyle continued. False otherwise. |
+| Name               | Type    | Description                                                                                     |
+| ------------------ | ------- | ----------------------------------------------------------------------------------------------- |
+| `force_continued`  | boolean | True if continue-after-seconds is used and the step using turnstyle continued. False otherwise. |
+| `previous_run_id`  | string  | The ID of the previous workflow run that Turnstyle waited on, if one was found.                 |
+| `previous_run_url` | string  | The URL of the previous workflow run that Turnstyle waited on, if one was found.                |
 
 ## required permissions
 
