@@ -6,6 +6,7 @@ export interface Input {
   workflowName: string;
   workflowPath: string | undefined;
   runId: number;
+  runAttempt: number;
   pollIntervalSeconds: number;
   continueAfterSeconds: number | undefined;
   abortAfterSeconds: number | undefined;
@@ -73,6 +74,11 @@ const parseWorkflowPath = (
   return workflowRefPath.substring(repoPrefix.length);
 };
 
+const parseRunAttempt = (runAttempt: string | undefined): number => {
+  const value = Number(runAttempt || '1');
+  return Number.isSafeInteger(value) && value > 0 ? value : 1;
+};
+
 export const parseInput = (env: Record<string, string | undefined>): Input => {
   const githubToken = env['INPUT_TOKEN'] || '';
   const [owner, repo] = (env.GITHUB_REPOSITORY || '').split('/');
@@ -81,6 +87,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
   const branch =
     env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME || parseRefName(env.GITHUB_REF) || 'master';
   const runId = parseInt(env.GITHUB_RUN_ID || '0', 10);
+  const runAttempt = parseRunAttempt(env.GITHUB_RUN_ATTEMPT);
   const pollIntervalSeconds = parseSecondsInput(env, 'INPUT_POLL-INTERVAL-SECONDS', 60, 1) ?? 60;
   const continueAfterSeconds = parseSecondsInput(env, 'INPUT_CONTINUE-AFTER-SECONDS', undefined, 0);
   const abortAfterSeconds = parseSecondsInput(env, 'INPUT_ABORT-AFTER-SECONDS', undefined, 0);
@@ -106,6 +113,7 @@ export const parseInput = (env: Record<string, string | undefined>): Input => {
     workflowName,
     workflowPath,
     runId,
+    runAttempt,
     pollIntervalSeconds,
     continueAfterSeconds,
     abortAfterSeconds,
