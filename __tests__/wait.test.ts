@@ -1,7 +1,14 @@
+import { setOutput } from '@actions/core';
 import { assert, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Input } from '../src/input';
 import { Waiter } from '../src/wait';
+
+vi.mock('@actions/core', () => ({
+  setOutput: vi.fn(),
+}));
+
+const setOutputMock = vi.mocked(setOutput);
 
 describe('wait', () => {
   describe('Waiter', () => {
@@ -13,6 +20,7 @@ describe('wait', () => {
       };
 
       beforeEach(() => {
+        setOutputMock.mockClear();
         input = {
           branch: 'master',
           continueAfterSeconds: undefined,
@@ -181,6 +189,8 @@ describe('wait', () => {
         );
         await waiter.wait();
         assert.deepEqual(messages, ['✋Awaiting run 1 ...']);
+        expect(setOutputMock).toHaveBeenCalledWith('previous_run_id', '1');
+        expect(setOutputMock).toHaveBeenCalledWith('previous_run_url', '1');
       });
 
       it('will wait for all previous runs', async () => {
@@ -499,6 +509,8 @@ describe('wait', () => {
         await waiter.wait();
 
         expect(messages).toEqual([]);
+        expect(setOutputMock).toHaveBeenCalledWith('previous_run_id', '');
+        expect(setOutputMock).toHaveBeenCalledWith('previous_run_url', '');
       });
 
       it('will not wait for a lower-id rerun attempt that starts after the current run', async () => {
@@ -811,6 +823,8 @@ describe('wait', () => {
           '✋Awaiting job run completion from job job-url ...',
           'Job test-job completed from run 1',
         ]);
+        expect(setOutputMock).toHaveBeenCalledWith('previous_run_id', '1');
+        expect(setOutputMock).toHaveBeenCalledWith('previous_run_url', '1');
       });
 
       it('will keep checking previous runs after a rerun predecessor job is complete', async () => {
@@ -939,6 +953,8 @@ describe('wait', () => {
           '✋Awaiting step completion from job job-url ...',
           'Step test-step completed from run 1',
         ]);
+        expect(setOutputMock).toHaveBeenCalledWith('previous_run_id', '1');
+        expect(setOutputMock).toHaveBeenCalledWith('previous_run_url', '1');
       });
 
       it('will await the full run if the job is not found', async () => {

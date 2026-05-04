@@ -33,6 +33,10 @@ inputs:
 outputs:
   force_continued:
     description: "True if continue-after-seconds is used and the step using turnstyle continued. False otherwise."
+  previous_run_id:
+    description: "The ID of the previous workflow run that Turnstyle waited on, if one was found."
+  previous_run_url:
+    description: "The URL of the previous workflow run that Turnstyle waited on, if one was found."
 branding:
   color: 'green'
   icon: 'git-commit'

@@ -87,6 +87,11 @@ const compareRunsNewestFirst = (a: WorkflowRun, b: WorkflowRun) => {
   return b.id - a.id;
 };
 
+const outputPreviousRun = (run: WorkflowRun | undefined) => {
+  setOutput('previous_run_id', run ? String(run.id) : '');
+  setOutput('previous_run_url', run?.html_url || '');
+};
+
 export interface Wait {
   wait(secondsSoFar?: number): Promise<number>;
 }
@@ -98,6 +103,7 @@ export class Waiter implements Wait {
   private githubClient: GitHub;
   private readonly workflowId: any;
   private readonly allWorkflows: any[];
+  private previousRunOutput: WorkflowRun | undefined;
 
   constructor(
     workflowId: any,
@@ -115,6 +121,17 @@ export class Waiter implements Wait {
     this.allWorkflows = allWorkflows;
   }
 
+  private setPreviousRunOutput = (run: WorkflowRun | undefined) => {
+    this.previousRunOutput = run;
+    outputPreviousRun(run);
+  };
+
+  private clearPreviousRunOutput = () => {
+    if (!this.previousRunOutput) {
+      outputPreviousRun(undefined);
+    }
+  };
+
   wait = async (secondsSoFar?: number) => {
     const elapsedSeconds = secondsSoFar || 0;
 
@@ -124,6 +141,7 @@ export class Waiter implements Wait {
     ) {
       this.info(`🤙Exceeded wait seconds. Continuing...`);
       setOutput('force_continued', '1');
+      this.clearPreviousRunOutput();
       return elapsedSeconds;
     }
 
@@ -133,6 +151,7 @@ export class Waiter implements Wait {
     ) {
       this.info(`🛑Exceeded wait seconds. Aborting...`);
       setOutput('force_continued', '');
+      this.clearPreviousRunOutput();
       throw new Error(`Aborted after waiting ${elapsedSeconds} seconds`);
     }
 
@@ -231,6 +250,7 @@ export class Waiter implements Wait {
       .slice(0, MAX_PREVIOUS_WORKFLOW_RUNS);
     if (!previousRuns || !previousRuns.length) {
       setOutput('force_continued', '');
+      this.clearPreviousRunOutput();
       if (this.input.initialWaitSeconds > 0 && elapsedSeconds < this.input.initialWaitSeconds) {
         this.info(
           `🔎 Waiting for ${this.input.initialWaitSeconds} seconds before checking for runs again...`,
@@ -259,6 +279,7 @@ export class Waiter implements Wait {
           const steps = await this.githubClient.steps(this.input.owner, this.input.repo, job.id);
           const step = steps.find((step) => step.name === this.input.stepToWaitFor);
           if (step && step.status !== 'completed') {
+            this.setPreviousRunOutput(previousRun);
             this.info(`✋Awaiting step completion from job ${job.html_url} ...`);
             return this.pollAndWait(secondsSoFar);
           } else if (step) {
@@ -274,6 +295,7 @@ export class Waiter implements Wait {
         }
 
         if (job && job.status !== 'completed') {
+          this.setPreviousRunOutput(previousRun);
           this.info(`✋Awaiting job run completion from job ${job.html_url} ...`);
           return this.pollAndWait(secondsSoFar);
         } else if (job) {
@@ -285,13 +307,16 @@ export class Waiter implements Wait {
           );
         }
 
+        this.setPreviousRunOutput(previousRun);
         this.info(`✋Awaiting run ${previousRun.html_url} ...`);
         return this.pollAndWait(secondsSoFar);
       }
+      this.clearPreviousRunOutput();
       return;
     }
 
     const previousRun = previousRuns[0];
+    this.setPreviousRunOutput(previousRun);
     this.info(`✋Awaiting run ${previousRun.html_url} ...`);
     return this.pollAndWait(secondsSoFar);
   };
