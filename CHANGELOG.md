@@ -1,3 +1,11 @@
+## 3.2.4
+
+### Bug fixes 🐛
+
+- Fix runtime input parsing and GitHub API throttling by @chenrui333 in https://github.com/softprops/turnstyle/pull/140
+- Resolve workflows by ref path for more reliable workflow discovery by @chenrui333 in https://github.com/softprops/turnstyle/pull/141
+- Improve workflow run discovery and rerun ordering so active predecessors are not missed in busy repositories by @chenrui333 in https://github.com/softprops/turnstyle/pull/142
+
 ## 3.2.3
 
 maintenance release with updated dependencies
