@@ -17,8 +17,13 @@ const parseTimestamp = (value: string | null | undefined): number | undefined =>
 const runTimestamp = (run: WorkflowRun): number | undefined =>
   parseTimestamp(run.run_started_at) || parseTimestamp(run.created_at);
 
+const runStartedTimestamp = (run: WorkflowRun): number | undefined =>
+  parseTimestamp(run.run_started_at);
+
 const runCreatedTimestamp = (run: WorkflowRun): number | undefined =>
   parseTimestamp(run.created_at);
+
+const isRerunAttempt = (run: WorkflowRun): boolean => (run.run_attempt || 1) > 1;
 
 const isActiveRun = (run: WorkflowRun) => ACTIVE_RUN_STATUSES.has(run.status || '');
 
@@ -39,6 +44,17 @@ const isPreviousRun = (run: WorkflowRun, input: Input, currentRunStartedAt: numb
 
   if (input.runAttempt <= 1 || currentRunStartedAt === undefined) {
     return run.id < input.runId;
+  }
+
+  if (isRerunAttempt(run)) {
+    const startedAt = runStartedTimestamp(run);
+    if (startedAt === undefined) {
+      return false;
+    }
+
+    return (
+      startedAt < currentRunStartedAt || (startedAt === currentRunStartedAt && run.id < input.runId)
+    );
   }
 
   if (run.id < input.runId) {
