@@ -243,6 +243,46 @@ describe('wait', () => {
         assert.deepEqual(messages[messages.length - 1], `✋Awaiting run ${input.runId - 1} ...`);
       });
 
+      it('will wait for an older predecessor behind newer active runs', async () => {
+        input.runId = 1000;
+        input.pollIntervalSeconds = 0;
+
+        const newerActiveRuns = Array.from({ length: 500 }, (_, index) => ({
+          id: input.runId + index + 1,
+          status: 'in_progress',
+          html_url: 'newer-' + (index + 1),
+        }));
+        const predecessorRun = {
+          id: input.runId - 1,
+          status: 'queued',
+          html_url: 'predecessor-run',
+        };
+
+        const githubClient = {
+          runs: vi
+            .fn()
+            .mockResolvedValueOnce([...newerActiveRuns, predecessorRun])
+            .mockResolvedValue([]),
+          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+        };
+
+        const messages: Array<string> = [];
+        const waiter = new Waiter(
+          workflow.id,
+          // @ts-ignore
+          githubClient,
+          input,
+          (message: string) => {
+            messages.push(message);
+          },
+          () => {},
+        );
+
+        await waiter.wait();
+
+        expect(messages[0]).toBe('✋Awaiting run predecessor-run ...');
+      });
+
       it('will wait for in_progress, queued, and waiting runs', async () => {
         const existingRuns = [
           {

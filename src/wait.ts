@@ -3,6 +3,7 @@ import { OctokitGitHub as GitHub, WorkflowRun } from './github';
 import { Input } from './input';
 
 const ACTIVE_RUN_STATUSES = new Set(['in_progress', 'queued', 'waiting']);
+const MAX_PREVIOUS_WORKFLOW_RUNS = 500;
 
 const runTimestamp = (run: WorkflowRun): number | undefined => {
   const value = run.run_started_at || run.created_at;
@@ -196,7 +197,8 @@ export class Waiter implements Wait {
 
         return !isSuccessful;
       })
-      .sort(compareRunsNewestFirst);
+      .sort(compareRunsNewestFirst)
+      .slice(0, MAX_PREVIOUS_WORKFLOW_RUNS);
     if (!previousRuns || !previousRuns.length) {
       setOutput('force_continued', '');
       if (this.input.initialWaitSeconds > 0 && elapsedSeconds < this.input.initialWaitSeconds) {

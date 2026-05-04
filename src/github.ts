@@ -4,7 +4,6 @@ import { Octokit } from '@octokit/rest';
 import { Endpoints } from '@octokit/types';
 
 const ThrottledOctokit = Octokit.plugin(throttling);
-const MAX_ELIGIBLE_WORKFLOW_RUNS = 500;
 const MAX_WORKFLOW_RUN_PAGES = 50;
 const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'] as const;
 const ACTIVE_RUN_STATUS_SET = new Set<string>(ACTIVE_RUN_STATUSES);
@@ -94,7 +93,6 @@ export class OctokitGitHub {
     };
 
     const listRuns = async (options: ListWorkflowRunsOptions) => {
-      let eligibleRuns = 0;
       let pagesScanned = 0;
       const runs = await this.octokit.paginate(
         this.octokit.actions.listWorkflowRuns,
@@ -104,17 +102,13 @@ export class OctokitGitHub {
           const filteredRuns = response.data.filter((run) =>
             matchesWorkflowRunFilters(run, filters),
           );
-          eligibleRuns += filteredRuns.length;
-          if (
-            eligibleRuns >= MAX_ELIGIBLE_WORKFLOW_RUNS ||
-            pagesScanned >= MAX_WORKFLOW_RUN_PAGES
-          ) {
+          if (pagesScanned >= MAX_WORKFLOW_RUN_PAGES) {
             done();
           }
           return filteredRuns;
         },
       );
-      return runs.slice(0, MAX_ELIGIBLE_WORKFLOW_RUNS);
+      return runs;
     };
 
     // Combine unfiltered discovery for stale status-filter safety with active status queries so
@@ -134,7 +128,7 @@ export class OctokitGitHub {
     for (const run of [unfilteredRuns, ...statusFilteredRuns].flat()) {
       runsById.set(run.id, run);
     }
-    return [...runsById.values()].slice(0, MAX_ELIGIBLE_WORKFLOW_RUNS);
+    return [...runsById.values()];
   };
 
   jobs = async (owner: string, repo: string, run_id: number) => {

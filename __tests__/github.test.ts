@@ -189,6 +189,29 @@ describe('github', () => {
       }
     });
 
+    it('does not cap discovered active runs before predecessor filtering', async () => {
+      const newerActivePages = Array.from({ length: 5 }, (_, pageIndex) =>
+        Array.from({ length: 100 }, (_, runIndex) =>
+          run({
+            id: pageIndex * 100 + runIndex + 1,
+            status: 'queued',
+            conclusion: null,
+          }),
+        ),
+      );
+      const olderActiveRun = run({
+        id: 501,
+        status: 'queued',
+        conclusion: null,
+      });
+      const { client } = clientWithRunPages([...newerActivePages, [olderActiveRun]], [], [], []);
+
+      const runs = await client.runs('org', 'repo', 123);
+
+      expect(runs).toHaveLength(501);
+      expect(runs).toContain(olderActiveRun);
+    });
+
     it('stops pagination when no eligible active runs are found', async () => {
       const completedPages = Array.from({ length: 51 }, (_, pageIndex) =>
         Array.from({ length: 100 }, (_, runIndex) =>
