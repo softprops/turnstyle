@@ -256,18 +256,19 @@ jobs:
 
 #### inputs
 
-| Name                     | Type    | Description                                                                                                                            |
-| ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `token`                  | string  | GitHub access token used for Actions API reads (defaults to `github.token`)                                                            |
-| `continue-after-seconds` | number  | Maximum number of seconds to wait before moving forward (unbound by default). Mutually exclusive with abort-after-seconds              |
-| `abort-after-seconds`    | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds         |
-| `poll-interval-seconds`  | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                               |
-| `same-branch-only`       | boolean | Only wait on other runs from the same branch (defaults to true)                                                                        |
-| `branch`                 | string  | Branch name to use for same-branch filtering (defaults to the current branch)                                                         |
-| `initial-wait-seconds`   | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt |
-| `job-to-wait-for`        | string  | Name of the workflow's job to wait for (unbound by default).                                                                           |
-| `step-to-wait-for`       | string  | Name of the step to wait for (unbound by default). Requires job-to-wait-for to be set.                                                 |
-| `queue-name`             | string  | Custom substring used to group matching runs across workflows (defaults to the current workflow only).                                 |
+| Name                     | Type    | Description                                                                                                                                 |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`                  | string  | GitHub access token used for Actions API reads (defaults to `github.token`)                                                                 |
+| `continue-after-seconds` | number  | Maximum number of seconds to wait before moving forward (unbound by default). Mutually exclusive with abort-after-seconds                   |
+| `abort-after-seconds`    | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds              |
+| `poll-interval-seconds`  | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                                    |
+| `same-branch-only`       | boolean | Only wait on other runs from the same branch (defaults to true)                                                                             |
+| `branch`                 | string  | Branch name to use for same-branch filtering (defaults to the current branch)                                                               |
+| `initial-wait-seconds`   | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt      |
+| `job-to-wait-for`        | string  | Name of the workflow's job to wait for (unbound by default).                                                                                |
+| `step-to-wait-for`       | string  | Name of the step to wait for (unbound by default). Requires job-to-wait-for to be set.                                                      |
+| `queue-name`             | string  | Custom substring used to group matching runs across workflows (defaults to the current workflow only).                                      |
+| `retries`                | number  | Number of times to retry GitHub API requests that fail with a transient 5xx error, using exponential backoff (defaults to 0, ie no retries) |
 
 #### outputs
 

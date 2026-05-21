@@ -36,6 +36,7 @@ describe('input', () => {
           stepToWaitFor: 'step-name',
           initialWaitSeconds: 5,
           queueName: undefined,
+          retries: 0,
         },
       );
     });
@@ -70,6 +71,7 @@ describe('input', () => {
           stepToWaitFor: undefined,
           initialWaitSeconds: 0,
           queueName: undefined,
+          retries: 0,
         },
       );
     });
@@ -129,6 +131,8 @@ describe('input', () => {
         ['INPUT_INITIAL-WAIT-SECONDS', 'abc', /initial-wait-seconds/],
         ['INPUT_POLL-INTERVAL-SECONDS', '0', /poll-interval-seconds/],
         ['INPUT_POLL-INTERVAL-SECONDS', '5s', /poll-interval-seconds/],
+        ['INPUT_RETRIES', '-1', /retries/],
+        ['INPUT_RETRIES', 'abc', /retries/],
       ];
 
       invalidInputs.forEach(([inputName, value, expectedMessage]) => {
@@ -188,6 +192,7 @@ describe('input', () => {
           stepToWaitFor: '',
           initialWaitSeconds: 0,
           queueName: undefined,
+          retries: 0,
         },
       );
     });
@@ -219,6 +224,7 @@ describe('input', () => {
           stepToWaitFor: undefined,
           initialWaitSeconds: 0,
           queueName: undefined,
+          retries: 0,
         },
       );
     });
@@ -328,6 +334,7 @@ describe('input', () => {
           stepToWaitFor: 'step-name',
           initialWaitSeconds: 5,
           queueName: 'queue-name',
+          retries: 0,
         },
       );
     });
@@ -343,6 +350,20 @@ describe('input', () => {
           INPUT_TOKEN: 's3cr3t',
         }).runAttempt,
         3,
+      );
+    });
+
+    it('parses retries input', () => {
+      assert.equal(
+        parseInput({
+          GITHUB_REF: 'refs/heads/foo',
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW: 'test',
+          GITHUB_RUN_ID: '1',
+          INPUT_TOKEN: 's3cr3t',
+          INPUT_RETRIES: '5',
+        }).retries,
+        5,
       );
     });
   });
