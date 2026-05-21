@@ -13,7 +13,7 @@ async function run() {
         input,
       )}`,
     );
-    const github = new OctokitGitHub(input.githubToken);
+    const github = new OctokitGitHub(input.githubToken, input.retries);
     debug(`Fetching workflows for ${input.owner}/${input.repo}...`);
     const workflows = await github.workflows(input.owner, input.repo);
     debug(`Found ${workflows.length} workflows in ${input.owner}/${input.repo}`);
