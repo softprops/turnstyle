@@ -30,6 +30,9 @@ inputs:
     description: "Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first poll (0 by default, ie doesn't retry)"
   queue-name:
     description: 'Custom name for grouping runs by the value if not specified will take the workflow name (unbound by default)'
+  retries:
+    description: "Number of times to retry GitHub API requests that fail with a transient 5xx error, using exponential backoff (0 by default, ie no retries)"
+    default: "0"
 outputs:
   force_continued:
     description: "True if continue-after-seconds is used and the step using turnstyle continued. False otherwise."

@@ -26,6 +26,7 @@
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^3.0.1",
+    "@octokit/plugin-retry": "^8.1.0",
     "@octokit/plugin-throttling": "^11.0.3",
     "@octokit/rest": "^22.0.1"
   },

@@ -1,9 +1,10 @@
 import { debug, warning } from '@actions/core';
+import { retry } from '@octokit/plugin-retry';
 import { throttling } from '@octokit/plugin-throttling';
 import { Octokit } from '@octokit/rest';
 import { Endpoints } from '@octokit/types';
 
-const ThrottledOctokit = Octokit.plugin(throttling);
+const ThrottledOctokit = Octokit.plugin(throttling, retry);
 const MAX_WORKFLOW_RUN_PAGES = 50;
 const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'] as const;
 const ACTIVE_RUN_STATUS_SET = new Set<string>(ACTIVE_RUN_STATUSES);
@@ -39,10 +40,20 @@ const matchesWorkflowRunFilters = (run: WorkflowRun, filters: WorkflowRunFilters
 export class OctokitGitHub {
   private readonly octokit: InstanceType<typeof ThrottledOctokit>;
 
-  constructor(githubToken: string) {
+  constructor(githubToken: string, retries: number = 0) {
     this.octokit = new ThrottledOctokit({
       baseUrl: process.env['GITHUB_API_URL'] || 'https://api.github.com',
       auth: githubToken,
+      // retries defaults to 0, which disables the retry plugin entirely (no
+      // request wrapping). When set, it retries transient 5xx (and network
+      // errors) with backoff.
+      // doNotRetry is the plugin's default list plus 429, so rate limits stay
+      // owned by plugin-throttling above and retry only covers transient 5xx.
+      retry: {
+        enabled: retries > 0,
+        retries,
+        doNotRetry: [400, 401, 403, 404, 410, 422, 429, 451],
+      },
       throttle: {
         onRateLimit: (retryAfter, options, octokit, retryCount) => {
           warning(`Request quota exhausted for request ${options.method} ${options.url}`);
