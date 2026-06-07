@@ -160,6 +160,50 @@ describe('wait', () => {
         assert.deepEqual(messages, ['🛑Exceeded wait seconds. Aborting...']);
       });
 
+      it('will abort while workflow run discovery is still pending', async () => {
+        vi.useFakeTimers();
+        try {
+          input.abortAfterSeconds = 1;
+          const currentRun = {
+            id: input.runId,
+            run_attempt: input.runAttempt,
+            status: 'in_progress',
+            html_url: 'current-run',
+            created_at: '2026-05-03T10:00:00Z',
+            run_started_at: '2026-05-03T10:00:00Z',
+          };
+          const githubClient = {
+            run: vi.fn().mockResolvedValue(currentRun),
+            runs: vi.fn().mockReturnValue(new Promise(() => {})),
+            workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+          };
+
+          const messages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow.id,
+            // @ts-ignore
+            githubClient,
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            () => {},
+          );
+          const waitPromise = waiter.wait();
+          const assertion = expect(waitPromise).rejects.toMatchObject({
+            name: 'Error',
+            message: 'Aborted after waiting 1 seconds',
+          });
+
+          await vi.advanceTimersByTimeAsync(1000);
+
+          await assertion;
+          expect(messages).toEqual(['🛑Exceeded wait seconds. Aborting...']);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
       it('will return when a run is completed', async () => {
         const run = {
           id: 1,
@@ -1078,7 +1122,7 @@ describe('wait', () => {
             branch: 'master',
             continueAfterSeconds: undefined,
             abortAfterSeconds: undefined,
-            pollIntervalSeconds: 1,
+            pollIntervalSeconds: 0,
             githubToken: 'fake-token',
             owner: 'org',
             repo: 'repo',
@@ -1094,11 +1138,11 @@ describe('wait', () => {
           };
         });
 
-        it('should search across all workflows when queue-name is provided', async () => {
+        it('should search active repo runs when queue-name is provided', async () => {
           input.queueName = 'repoa';
           input.runId = 4;
 
-          const workflow1Runs = [
+          const repoRuns = [
             {
               id: 1,
               status: 'in_progress',
@@ -1107,9 +1151,6 @@ describe('wait', () => {
               display_title: 'random1-repoa',
               name: 'random1-repoa',
             },
-          ];
-
-          const workflow2Runs = [
             {
               id: 3,
               status: 'in_progress',
@@ -1120,15 +1161,12 @@ describe('wait', () => {
             },
           ];
 
-          const mockedRunsFunc = vi
-            .fn()
-            .mockResolvedValueOnce(workflow1Runs)
-            .mockResolvedValueOnce(workflow1Runs)
-            .mockResolvedValueOnce(workflow2Runs)
-            .mockResolvedValue([]);
+          const mockedRunsFunc = vi.fn().mockResolvedValue([]);
+          const activeRunsForRepo = vi.fn().mockResolvedValueOnce(repoRuns).mockResolvedValue([]);
 
           const githubClient = {
             runs: mockedRunsFunc,
+            activeRunsForRepo,
             workflows: async (owner: string, repo: string) =>
               Promise.resolve([workflow1, workflow2]),
           };
@@ -1151,9 +1189,16 @@ describe('wait', () => {
 
           await waiter.wait();
 
-          expect(mockedRunsFunc.mock.calls.length).toBeGreaterThanOrEqual(2);
+          expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', workflow1.id, {
+            branch: undefined,
+          });
+          expect(activeRunsForRepo).toHaveBeenCalledWith('org', 'repo', {
+            branch: undefined,
+          });
 
-          const hasSearchMessage = debugMessages.some((msg) => msg.includes('Searching across'));
+          const hasSearchMessage = debugMessages.some((msg) =>
+            msg.includes('Searching active workflow runs across repository'),
+          );
           expect(hasSearchMessage).toBe(true);
 
           expect(messages.length).toBeGreaterThan(0);
@@ -1198,12 +1243,8 @@ describe('wait', () => {
           ];
 
           const githubClient = {
-            runs: vi
-              .fn()
-              .mockResolvedValueOnce([])
-              .mockResolvedValueOnce(allRuns)
-              .mockResolvedValueOnce([])
-              .mockResolvedValue([]),
+            runs: vi.fn().mockResolvedValue([]),
+            activeRunsForRepo: vi.fn().mockResolvedValueOnce(allRuns).mockResolvedValue([]),
             workflows: async () => Promise.resolve([workflow1, workflow2]),
           };
 
@@ -1250,11 +1291,8 @@ describe('wait', () => {
           ];
 
           const githubClient = {
-            runs: vi
-              .fn()
-              .mockResolvedValueOnce([])
-              .mockResolvedValueOnce(allRuns)
-              .mockResolvedValue([]),
+            runs: vi.fn().mockResolvedValue([]),
+            activeRunsForRepo: vi.fn().mockResolvedValueOnce(allRuns).mockResolvedValue([]),
             workflows: async () => Promise.resolve([workflow1]),
           };
 
@@ -1334,32 +1372,20 @@ describe('wait', () => {
           });
         });
 
-        it('should batch workflow requests to avoid rate limits', async () => {
+        it('keeps queue-name discovery bounded on repositories with many workflows', async () => {
           input.queueName = 'repoa';
 
-          const manyWorkflows = Array.from({ length: 25 }, (_, i) => ({
+          const manyWorkflows = Array.from({ length: 39 }, (_, i) => ({
             id: i + 1,
             name: `Workflow ${i + 1}`,
           }));
 
-          const runs = [
-            {
-              id: 1,
-              status: 'in_progress',
-              html_url: '1',
-              display_title: 'test-repoa',
-            },
-          ];
-
-          const mockedRunsFunc = vi
-            .fn()
-            .mockResolvedValueOnce([])
-            .mockResolvedValue(
-              runs.map((r) => ({ ...r, status: 'completed', conclusion: 'success' })),
-            );
+          const mockedRunsFunc = vi.fn().mockResolvedValue([]);
+          const activeRunsForRepo = vi.fn().mockResolvedValue([]);
 
           const githubClient = {
             runs: mockedRunsFunc,
+            activeRunsForRepo,
             workflows: async (owner: string, repo: string) => Promise.resolve(manyWorkflows),
           };
 
@@ -1381,79 +1407,22 @@ describe('wait', () => {
 
           await waiter.wait();
 
-          expect(mockedRunsFunc).toHaveBeenCalledTimes(26);
-
-          const batchMessages = debugMessages.filter((msg) =>
-            msg.includes('Processing workflow batch'),
-          );
-          expect(batchMessages.length).toBeGreaterThan(1);
-          expect(batchMessages.length).toBe(3);
-        });
-
-        it('should handle failed workflow run fetches gracefully with Promise.allSettled', async () => {
-          input.queueName = 'repoa';
-          input.runId = 4;
-
-          const successfulRuns = [
-            {
-              id: 1,
-              status: 'in_progress',
-              html_url: '1',
-              conclusion: null,
-              display_title: 'random1-repoa',
-            },
-          ];
-
-          const mockedRunsFunc = vi
-            .fn()
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce(successfulRuns)
-            .mockRejectedValueOnce(new Error('API Error'))
-            .mockResolvedValue([]);
-
-          const githubClient = {
-            runs: mockedRunsFunc,
-            workflows: async (owner: string, repo: string) =>
-              Promise.resolve([workflow1, workflow2]),
-          };
-
-          const messages: Array<string> = [];
-          const debugMessages: Array<string> = [];
-          const waiter = new Waiter(
-            workflow1.id,
-            // @ts-ignore
-            githubClient,
-            input,
-            (message: string) => {
-              messages.push(message);
-            },
-            (message: string) => {
-              debugMessages.push(message);
-            },
-            [workflow1, workflow2],
-          );
-
-          await waiter.wait();
-          const failureMessage = debugMessages.find(
-            (msg) => msg.includes('Failed to fetch runs') && msg.includes(workflow2.id),
-          );
-          expect(failureMessage).toBeDefined();
+          expect(mockedRunsFunc).toHaveBeenCalledTimes(1);
+          expect(activeRunsForRepo).toHaveBeenCalledTimes(1);
+          expect(debugMessages).not.toContain('Processing workflow batch');
         });
 
         it('should wait for previous runs across different workflows with same queue-name', async () => {
           input.queueName = 'repoa';
           input.runId = 4;
 
-          const workflow1Runs = [
+          const repoRuns = [
             {
               id: 1,
               status: 'in_progress',
               html_url: '1',
               display_title: 'random1-repoa',
             },
-          ];
-
-          const workflow2Runs = [
             {
               id: 3,
               status: 'in_progress',
@@ -1462,15 +1431,12 @@ describe('wait', () => {
             },
           ];
 
-          const mockedRunsFunc = vi
-            .fn()
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce(workflow1Runs)
-            .mockResolvedValueOnce(workflow2Runs)
-            .mockResolvedValue([]);
+          const mockedRunsFunc = vi.fn().mockResolvedValue([]);
+          const activeRunsForRepo = vi.fn().mockResolvedValueOnce(repoRuns).mockResolvedValue([]);
 
           const githubClient = {
             runs: mockedRunsFunc,
+            activeRunsForRepo,
             workflows: async (owner: string, repo: string) =>
               Promise.resolve([workflow1, workflow2]),
           };
@@ -1501,16 +1467,7 @@ describe('wait', () => {
           input.queueName = 'repoa';
           input.runId = 4;
 
-          const workflow1Runs = [
-            {
-              id: 1,
-              status: 'in_progress',
-              html_url: '1',
-              display_title: 'random1-repoa',
-            },
-          ];
-
-          const workflow2Runs = [
+          const repoRuns = [
             {
               id: 3,
               status: 'in_progress',
@@ -1519,14 +1476,12 @@ describe('wait', () => {
             },
           ];
 
-          const mockedRunsFunc = vi
-            .fn()
-            .mockResolvedValueOnce(workflow1Runs)
-            .mockResolvedValueOnce(workflow2Runs)
-            .mockResolvedValue([]);
+          const mockedRunsFunc = vi.fn().mockResolvedValue([]);
+          const activeRunsForRepo = vi.fn().mockResolvedValue(repoRuns);
 
           const githubClient = {
             runs: mockedRunsFunc,
+            activeRunsForRepo,
             workflows: async (owner: string, repo: string) =>
               Promise.resolve([workflow1, workflow2]),
           };
