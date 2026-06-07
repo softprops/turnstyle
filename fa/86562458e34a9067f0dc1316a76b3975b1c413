@@ -1,0 +1,21 @@
+package.json
+  s_61d766a50f6721::t_76017eaa29bd3b 3
+CHANGELOG.md
+  s_61d766a50f6721::t_bde855d21e4ea3 3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "fa86562458e34a9067f0dc1316a76b3975b1c413",
+  "prompts": {},
+  "sessions": {
+    "s_61d766a50f6721": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ea407-d8dd-7531-8b37-73b2cb2f3f56",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
