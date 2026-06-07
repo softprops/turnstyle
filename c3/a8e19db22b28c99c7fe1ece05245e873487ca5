@@ -1,0 +1,19 @@
+CHANGELOG.md
+  s_d6497ce648dd22::t_3bba1d674c89ae 3-4,7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "c3a8e19db22b28c99c7fe1ece05245e873487ca5",
+  "prompts": {},
+  "sessions": {
+    "s_d6497ce648dd22": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ea3c6-2aa7-7ba3-89e8-9aa82d25bf16",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
