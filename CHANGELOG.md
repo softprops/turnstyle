@@ -1,8 +1,10 @@
 ## Unreleased
 
+## 3.3.0
+
 ### Exciting New Features 🎉
 
-- Add configurable `retries` input to retry transient GitHub API 5xx errors with exponential backoff (defaults to 0, preserving the existing no-retry behavior)
+- Add configurable `retries` input to retry transient GitHub API 5xx errors with exponential backoff (defaults to 0, preserving the existing no-retry behavior), originally contributed by @mateusz-krainski-revoize in https://github.com/softprops/turnstyle/pull/148 and merged via https://github.com/softprops/turnstyle/pull/150
 - Document reusable workflow usage and queue naming behavior by @chenrui333 in https://github.com/softprops/turnstyle/pull/143
 - Allow same-branch filtering to target an explicit branch by @chenrui333 in https://github.com/softprops/turnstyle/pull/144
 - Expose previous run ID and URL outputs by @chenrui333 in https://github.com/softprops/turnstyle/pull/145
