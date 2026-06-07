@@ -136,6 +136,49 @@ export class Waiter implements Wait {
     }
   };
 
+  private abortError = (elapsedSeconds: number): Error => {
+    this.info(`🛑Exceeded wait seconds. Aborting...`);
+    setOutput('force_continued', '');
+    this.clearPreviousRunOutput();
+    return new Error(`Aborted after waiting ${elapsedSeconds} seconds`);
+  };
+
+  private abort = (elapsedSeconds: number): never => {
+    throw this.abortError(elapsedSeconds);
+  };
+
+  private withAbortTimeout = async <T>(
+    elapsedSeconds: number,
+    operation: (signal: AbortSignal | undefined) => Promise<T>,
+  ): Promise<T> => {
+    if (this.input.abortAfterSeconds === undefined) {
+      return operation(undefined);
+    }
+
+    const abortAtSeconds = this.input.abortAfterSeconds;
+    if (elapsedSeconds >= abortAtSeconds) {
+      this.abort(elapsedSeconds);
+    }
+
+    const remainingMilliseconds = (abortAtSeconds - elapsedSeconds) * 1000;
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(this.abortError(abortAtSeconds));
+      }, remainingMilliseconds);
+    });
+
+    try {
+      return await Promise.race([operation(controller.signal), timeoutPromise]);
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    }
+  };
+
   wait = async (secondsSoFar?: number) => {
     const elapsedSeconds = secondsSoFar || 0;
 
@@ -153,77 +196,89 @@ export class Waiter implements Wait {
       this.input.abortAfterSeconds !== undefined &&
       elapsedSeconds >= this.input.abortAfterSeconds
     ) {
-      this.info(`🛑Exceeded wait seconds. Aborting...`);
-      setOutput('force_continued', '');
-      this.clearPreviousRunOutput();
-      throw new Error(`Aborted after waiting ${elapsedSeconds} seconds`);
+      this.abort(elapsedSeconds);
     }
 
     this.debug(`Fetching workflow runs for workflow ID: ${this.workflowId}`);
-    let currentRun: WorkflowRun | undefined;
-    try {
-      currentRun = await this.githubClient.run(this.input.owner, this.input.repo, this.input.runId);
-    } catch (error: any) {
-      this.debug(`Failed to fetch current run ${this.input.runId}: ${error.message}`);
-    }
-
-    const runFilters = {
-      branch: this.input.sameBranchOnly ? this.input.branch : undefined,
-    };
-    const runs = await this.githubClient.runs(
-      this.input.owner,
-      this.input.repo,
-      this.workflowId,
-      runFilters,
-    );
-
-    this.debug(`Found ${runs.length} ${this.workflowId} runs`);
-
     const queueName = this.input.queueName;
-    currentRun = currentRun || findCurrentRun(runs, this.input);
-    let filteredRuns = filterEligibleRuns(runs, this.input);
-    const allWorkflowsSize = this.allWorkflows.length;
+    const { currentRun, filteredRuns } = await this.withAbortTimeout(
+      elapsedSeconds,
+      async (signal) => {
+        const requestOptions = signal ? { signal } : undefined;
+        let currentRun: WorkflowRun | undefined;
+        try {
+          currentRun = requestOptions
+            ? await this.githubClient.run(
+                this.input.owner,
+                this.input.repo,
+                this.input.runId,
+                requestOptions,
+              )
+            : await this.githubClient.run(this.input.owner, this.input.repo, this.input.runId);
+        } catch (error: any) {
+          this.debug(`Failed to fetch current run ${this.input.runId}: ${error.message}`);
+        }
 
-    if (queueName && allWorkflowsSize > 0) {
-      this.debug(`Searching across ${allWorkflowsSize} workflows for queue name: ${queueName}`);
-      const BATCH_SIZE = 10;
-      const allRuns: WorkflowRun[] = [];
-      for (let i = 0; i < allWorkflowsSize; i += BATCH_SIZE) {
-        const batch = this.allWorkflows.slice(i, i + BATCH_SIZE);
-        this.debug(
-          `Processing workflow batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allWorkflowsSize / BATCH_SIZE)}`,
-        );
-        const getRunsPromises = batch.map((workflow) =>
-          this.githubClient.runs(this.input.owner, this.input.repo, workflow.id, {
-            ...runFilters,
-            queueName,
-          }),
-        );
-        const batchResults = await Promise.allSettled(getRunsPromises);
-        batchResults.forEach((result, index) => {
-          if (result.status === 'fulfilled') {
-            allRuns.push(...result.value);
-            return;
-          }
-          const workflowId = batch[index].id;
-          this.debug(`Failed to fetch runs for workflow ${workflowId}: ${result.reason}`);
-        });
-      }
+        const runFilters = {
+          branch: this.input.sameBranchOnly ? this.input.branch : undefined,
+        };
+        const runs = requestOptions
+          ? await this.githubClient.runs(
+              this.input.owner,
+              this.input.repo,
+              this.workflowId,
+              runFilters,
+              requestOptions,
+            )
+          : await this.githubClient.runs(
+              this.input.owner,
+              this.input.repo,
+              this.workflowId,
+              runFilters,
+            );
 
-      currentRun = currentRun || findCurrentRun(allRuns, this.input);
-      filteredRuns = filterEligibleRuns(allRuns, this.input).filter((run) => {
-        const matchesQueue =
-          run.display_title?.includes(queueName) || run.name?.includes(queueName);
-        if (matchesQueue) {
+        this.debug(`Found ${runs.length} ${this.workflowId} runs`);
+
+        currentRun = currentRun || findCurrentRun(runs, this.input);
+        let filteredRuns = filterEligibleRuns(runs, this.input);
+
+        if (queueName) {
           this.debug(
-            `Run ${run.id} (${run.display_title || run.name}) matches queue: "${queueName}"`,
+            `Searching active workflow runs across repository for queue name: ${queueName}`,
+          );
+          const queueRuns = requestOptions
+            ? await this.githubClient.activeRunsForRepo(
+                this.input.owner,
+                this.input.repo,
+                runFilters,
+                requestOptions,
+              )
+            : await this.githubClient.activeRunsForRepo(
+                this.input.owner,
+                this.input.repo,
+                runFilters,
+              );
+
+          currentRun = currentRun || findCurrentRun(queueRuns, this.input);
+          filteredRuns = filterEligibleRuns(queueRuns, this.input).filter((run) => {
+            const matchesQueue =
+              run.display_title?.includes(queueName) || run.name?.includes(queueName);
+            if (matchesQueue) {
+              this.debug(
+                `Run ${run.id} (${run.display_title || run.name}) matches queue: "${queueName}"`,
+              );
+            }
+            return matchesQueue;
+          });
+
+          this.debug(
+            `After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`,
           );
         }
-        return matchesQueue;
-      });
 
-      this.debug(`After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`);
-    }
+        return { currentRun, filteredRuns };
+      },
+    );
 
     const currentRunStartedAt = currentRun ? runTimestamp(currentRun) : undefined;
     if (currentRunStartedAt !== undefined) {
