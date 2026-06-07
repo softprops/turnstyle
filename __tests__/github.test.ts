@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OctokitGitHub, WorkflowRun } from '../src/github';
 
@@ -17,6 +17,7 @@ const run = (overrides: Partial<WorkflowRun>): WorkflowRun =>
   }) as WorkflowRun;
 
 type WorkflowRunPages = WorkflowRun[][];
+const CLIENT_ERROR_STATUSES = Array.from({ length: 100 }, (_, index) => 400 + index);
 
 const clientWithRunPages = (...pagesByCall: WorkflowRunPages[]) => {
   const client = new OctokitGitHub('fake-token');
@@ -53,6 +54,32 @@ const clientWithRunPages = (...pagesByCall: WorkflowRunPages[]) => {
 };
 
 describe('github', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('retry', () => {
+    it('does not retry any 4xx responses when retries are enabled', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+      for (const status of CLIENT_ERROR_STATUSES) {
+        fetchMock.mockReset();
+        fetchMock.mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ message: 'Request failed with status ' + status }), {
+              status,
+              headers: { 'content-type': 'application/json' },
+            }),
+        );
+
+        const client = new OctokitGitHub('fake-token', 2);
+
+        await expect(client.run('org', 'repo-' + status, status)).rejects.toMatchObject({ status });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      }
+    });
+  });
+
   describe('runs', () => {
     it('does not stop pagination after newer completed runs', async () => {
       const completedPages = Array.from({ length: 5 }, (_, pageIndex) =>
