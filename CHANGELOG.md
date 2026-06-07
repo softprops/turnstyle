@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 3.3.1
+
 ### Bug fixes 🐛
 
 - Limit workflow run discovery to active runs, use repo-level active run lookup for `queue-name`, and surface rate-limit throttling in default logs to avoid excessive API usage in busy repositories. Fixes https://github.com/softprops/turnstyle/issues/146
