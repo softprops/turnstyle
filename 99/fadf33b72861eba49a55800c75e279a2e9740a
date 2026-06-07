@@ -1,0 +1,23 @@
+package-lock.json
+  ai_agent 3,9
+package.json
+  s_d6497ce648dd22::t_8f8e0aaddd8714 3
+CHANGELOG.md
+  s_d6497ce648dd22::t_0b502da10d8ed6 3-4,7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "99fadf33b72861eba49a55800c75e279a2e9740a",
+  "prompts": {},
+  "sessions": {
+    "s_d6497ce648dd22": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ea3c6-2aa7-7ba3-89e8-9aa82d25bf16",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
