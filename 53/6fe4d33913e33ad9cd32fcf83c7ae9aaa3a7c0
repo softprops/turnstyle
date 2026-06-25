@@ -1,0 +1,21 @@
+mise.toml
+  s_ea565ff3ca0726::t_8495347280d565 2
+.tool-versions
+  s_ea565ff3ca0726::t_8495347280d565 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "536fe4d33913e33ad9cd32fcf83c7ae9aaa3a7c0",
+  "prompts": {},
+  "sessions": {
+    "s_ea565ff3ca0726": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019effa3-caaa-7b53-aaf9-c18b7177c7d7",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
