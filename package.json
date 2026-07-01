@@ -31,12 +31,12 @@
     "@octokit/rest": "^22.0.1"
   },
   "devDependencies": {
-    "@types/node": "^24.12.4",
-    "@vitest/coverage-v8": "^4.1.7",
-    "esbuild": "^0.28.0",
+    "@types/node": "^24.13.2",
+    "@vitest/coverage-v8": "^4.1.9",
+    "esbuild": "^0.28.1",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.5",
-    "prettier": "^3.8.3",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.8.4",
     "typescript": "^6.0.3",
     "vitest": "^4.0.6"
   },
