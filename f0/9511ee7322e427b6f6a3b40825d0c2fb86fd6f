@@ -1,0 +1,23 @@
+package.json
+  s_2f72e80cdc783b::t_c5532a5cd3315f 44
+dist/index.js
+  s_2f72e80cdc783b::t_e9d9051d68ad30 1-5,7,10,13-14,16,18,22,24,26-27,29,34,36-37,40-41,44-46,56-58
+package-lock.json
+  s_2f72e80cdc783b::t_b68a5cad17ed36 2532-2534
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "f09511ee7322e427b6f6a3b40825d0c2fb86fd6f",
+  "prompts": {},
+  "sessions": {
+    "s_2f72e80cdc783b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f28fd-3061-7262-a222-e7957a392ae7",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
