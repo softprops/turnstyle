@@ -1,0 +1,24 @@
+.github/scripts/dependabot-automerge.py
+  s_2f72e80cdc783b::t_b7d9495c5482ec 1-106
+.github/dependabot.yml
+  s_2f72e80cdc783b::t_b7d9495c5482ec 11-13,30,33-35
+.github/workflows/dependabot-automerge.yml
+  s_2f72e80cdc783b::t_b7d9495c5482ec 1-10,12-33
+  s_2f72e80cdc783b::t_6365323cc6650b 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "f21284486e57161f84927afa279ab06014843c6c",
+  "prompts": {},
+  "sessions": {
+    "s_2f72e80cdc783b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f28fd-3061-7262-a222-e7957a392ae7",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
