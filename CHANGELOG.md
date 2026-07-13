@@ -1,5 +1,16 @@
 ## Unreleased
 
+## 3.3.2
+
+### Bug fixes 🐛
+
+- Update the bundled `undici` dependency to the patched 6.27.0 release.
+
+### Other Changes 🔄
+
+- Update the Node 24 development toolchain and GitHub Actions/npm dependencies, including TypeScript 7 in https://github.com/softprops/turnstyle/pull/155.
+- Improve internal type safety, test coverage, test type-checking, and failure reporting in https://github.com/softprops/turnstyle/pull/156.
+
 ## 3.3.1
 
 ### Bug fixes 🐛
