@@ -1,6 +1,6 @@
-import { Input } from './input';
+import type { Input } from './input';
 
-interface Workflow {
+export interface Workflow {
   id?: number;
   name?: string | null;
   path?: string | null;

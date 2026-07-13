@@ -2,16 +2,22 @@ import { warning } from '@actions/core';
 import { retry } from '@octokit/plugin-retry';
 import { throttling } from '@octokit/plugin-throttling';
 import { Octokit } from '@octokit/rest';
-import { Endpoints, RequestParameters } from '@octokit/types';
+import type { EndpointDefaults, Endpoints, RequestParameters } from '@octokit/types';
 
 const ThrottledOctokit = Octokit.plugin(throttling, retry);
 const MAX_WORKFLOW_RUN_PAGES = 50;
 const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'] as const;
 const ACTIVE_RUN_STATUS_SET = new Set<string>(ACTIVE_RUN_STATUSES);
 const DO_NOT_RETRY_STATUS_CODES = Array.from({ length: 100 }, (_, index) => 400 + index);
+type ThrottleRequestOptions = Pick<Required<EndpointDefaults>, 'method' | 'url'>;
 
 export const createThrottleOptions = () => ({
-  onRateLimit: (retryAfter: number, options: any, octokit: any, retryCount: number) => {
+  onRateLimit: (
+    retryAfter: number,
+    options: ThrottleRequestOptions,
+    _octokit: unknown,
+    retryCount: number,
+  ) => {
     warning(`Request quota exhausted for request ${options.method} ${options.url}`);
 
     if (retryCount < 1) {
@@ -20,7 +26,7 @@ export const createThrottleOptions = () => ({
       return true;
     }
   },
-  onSecondaryRateLimit: (retryAfter: number, options: any) => {
+  onSecondaryRateLimit: (_retryAfter: number, options: ThrottleRequestOptions) => {
     // does not retry, only logs a warning
     warning(`Secondary rate limit detected for request ${options.method} ${options.url}`);
   },
@@ -28,6 +34,9 @@ export const createThrottleOptions = () => ({
 
 export type WorkflowRun =
   Endpoints['GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs']['response']['data']['workflow_runs'][number];
+export type WorkflowJob =
+  Endpoints['GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs']['response']['data']['jobs'][number];
+export type WorkflowStep = NonNullable<WorkflowJob['steps']>[number];
 
 export interface WorkflowRunFilters {
   branch?: string;
@@ -109,10 +118,19 @@ export class OctokitGitHub {
     requestOptions: GitHubRequestOptions = {},
   ): Promise<WorkflowRun[]> => {
     const runsById = new Map<number, WorkflowRun>();
+    type WorkflowRunPaginator = (
+      listRuns:
+        | typeof this.octokit.actions.listWorkflowRuns
+        | typeof this.octokit.actions.listWorkflowRunsForRepo,
+      options: Record<string, unknown>,
+      map: (response: { data: WorkflowRun[] }, done: () => void) => WorkflowRun[],
+    ) => Promise<WorkflowRun[]>;
+    const paginateWorkflowRuns = this.octokit.paginate as unknown as WorkflowRunPaginator;
+
     await Promise.all(
       ACTIVE_RUN_STATUSES.map(async (status) => {
         let pagesScanned = 0;
-        const runs = (await (this.octokit.paginate as any)(
+        const runs = await paginateWorkflowRuns(
           listRuns,
           {
             ...baseOptions,
@@ -130,7 +148,7 @@ export class OctokitGitHub {
             }
             return filteredRuns;
           },
-        )) as WorkflowRun[];
+        );
 
         for (const run of runs) {
           runsById.set(run.id, run);

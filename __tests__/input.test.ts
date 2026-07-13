@@ -353,6 +353,84 @@ describe('input', () => {
       );
     });
 
+    it.each(['', '0', '-1', '1.5', 'abc', '9007199254740992'])(
+      'defaults malformed run attempt %j to one',
+      (runAttempt) => {
+        assert.equal(
+          parseInput({
+            GITHUB_REPOSITORY: 'softprops/turnstyle',
+            GITHUB_RUN_ATTEMPT: runAttempt,
+          }).runAttempt,
+          1,
+        );
+      },
+    );
+
+    it('trims numeric and branch inputs', () => {
+      const input = parseInput({
+        GITHUB_REPOSITORY: 'softprops/turnstyle',
+        GITHUB_RUN_ATTEMPT: ' 3 ',
+        INPUT_BRANCH: ' feature/branch ',
+        INPUT_RETRIES: ' 4 ',
+        'INPUT_CONTINUE-AFTER-SECONDS': ' 10 ',
+      });
+
+      assert.equal(input.runAttempt, 3);
+      assert.equal(input.branch, 'feature/branch');
+      assert.equal(input.retries, 4);
+      assert.equal(input.continueAfterSeconds, 10);
+    });
+
+    it('rejects unsafe integer inputs', () => {
+      const unsafeInteger = String(Number.MAX_SAFE_INTEGER + 1);
+
+      assert.throws(
+        () =>
+          parseInput({
+            GITHUB_REPOSITORY: 'softprops/turnstyle',
+            INPUT_RETRIES: unsafeInteger,
+          }),
+        /retries/,
+      );
+    });
+
+    it.each([
+      ['another repository', 'other/repo/.github/workflows/main.yml@refs/heads/main', undefined],
+      ['no repository', '.github/workflows/main.yml@refs/heads/main', undefined],
+      [
+        'no ref separator',
+        'softprops/turnstyle/.github/workflows/main.yml',
+        '.github/workflows/main.yml',
+      ],
+      [
+        'a branch containing slashes',
+        'softprops/turnstyle/.github/workflows/main.yml@refs/heads/feature/branch',
+        '.github/workflows/main.yml',
+      ],
+    ])('handles workflow references from %s', (_description, workflowRef, expected) => {
+      assert.equal(
+        parseInput({
+          GITHUB_REPOSITORY: 'softprops/turnstyle',
+          GITHUB_WORKFLOW_REF: workflowRef,
+        }).workflowPath,
+        expected,
+      );
+    });
+
+    it('preserves a bare ref name', () => {
+      assert.equal(parseInput({ GITHUB_REF: 'feature/bare' }).branch, 'feature/bare');
+    });
+
+    it.each([
+      [undefined, true],
+      ['', true],
+      ['true', true],
+      ['false', false],
+      ['TRUE', false],
+    ])('parses same-branch-only value %j as %s', (value, expected) => {
+      assert.equal(parseInput({ 'INPUT_SAME-BRANCH-ONLY': value }).sameBranchOnly, expected);
+    });
+
     it('parses retries input', () => {
       assert.equal(
         parseInput({

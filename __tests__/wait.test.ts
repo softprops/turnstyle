@@ -1,14 +1,24 @@
 import { setOutput } from '@actions/core';
 import { assert, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Input } from '../src/input';
-import { Waiter } from '../src/wait';
+import type { Input } from '../src/input';
+import { Waiter, type WaiterGitHubClient } from '../src/wait';
 
 vi.mock('@actions/core', () => ({
   setOutput: vi.fn(),
 }));
 
 const setOutputMock = vi.mocked(setOutput);
+const waiterClient = (overrides: Partial<WaiterGitHubClient> = {}): WaiterGitHubClient => ({
+  run: async () => {
+    throw new Error('current run unavailable');
+  },
+  runs: async () => [],
+  activeRunsForRepo: async () => [],
+  jobs: async () => [],
+  steps: async () => [],
+  ...overrides,
+});
 
 describe('wait', () => {
   describe('Waiter', () => {
@@ -25,7 +35,7 @@ describe('wait', () => {
           branch: 'master',
           continueAfterSeconds: undefined,
           abortAfterSeconds: undefined,
-          pollIntervalSeconds: 1,
+          pollIntervalSeconds: 0,
           githubToken: 'fake-token',
           owner: 'org',
           repo: 'repo',
@@ -38,42 +48,47 @@ describe('wait', () => {
           stepToWaitFor: undefined,
           initialWaitSeconds: 0,
           queueName: undefined,
+          retries: 0,
         };
       });
 
       it('will continue after a prescribed number of seconds', async () => {
-        input.continueAfterSeconds = 1;
-        const inProgressRun = {
-          id: 1,
-          status: 'in_progress',
-          html_url: '',
-        };
-        const githubClient = {
-          runs: async (
-            owner: string,
-            repo: string,
-            branch: string | undefined,
-            workflowId: number,
-          ) => Promise.resolve([inProgressRun]),
-          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
-        };
+        vi.useFakeTimers();
+        try {
+          input.continueAfterSeconds = 1;
+          input.pollIntervalSeconds = 1;
+          const inProgressRun = {
+            id: 1,
+            status: 'in_progress',
+            html_url: '',
+          };
+          const githubClient = {
+            runs: vi.fn().mockResolvedValue([inProgressRun]),
+            workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+          };
 
-        const messages: Array<string> = [];
-        const waiter = new Waiter(
-          workflow.id,
-          // @ts-ignore
-          githubClient,
-          input,
-          (message: string) => {
-            messages.push(message);
-          },
-          () => {},
-        );
-        assert.equal(await waiter.wait(), 1);
-        assert.deepEqual(messages, [
-          '✋Awaiting run  ...',
-          '🤙Exceeded wait seconds. Continuing...',
-        ]);
+          const messages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow.id,
+            waiterClient(githubClient),
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            () => {},
+          );
+          const waitPromise = waiter.wait();
+
+          await vi.advanceTimersByTimeAsync(1000);
+
+          assert.equal(await waitPromise, 1);
+          assert.deepEqual(messages, [
+            '✋Awaiting run  ...',
+            '🤙Exceeded wait seconds. Continuing...',
+          ]);
+        } finally {
+          vi.useRealTimers();
+        }
       });
 
       it('will continue immediately when continue-after-seconds is zero', async () => {
@@ -86,8 +101,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -100,38 +114,46 @@ describe('wait', () => {
       });
 
       it('will abort after a prescribed number of seconds', async () => {
-        input.abortAfterSeconds = 1;
-        const inProgressRun = {
-          id: 1,
-          status: 'in_progress',
-          html_url: '',
-        };
-        const githubClient = {
-          runs: async (
-            owner: string,
-            repo: string,
-            branch: string | undefined,
-            workflowId: number,
-          ) => Promise.resolve([inProgressRun]),
-          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
-        };
+        vi.useFakeTimers();
+        try {
+          input.abortAfterSeconds = 1;
+          input.pollIntervalSeconds = 1;
+          const inProgressRun = {
+            id: 1,
+            status: 'in_progress',
+            html_url: '',
+          };
+          const githubClient = {
+            runs: vi.fn().mockResolvedValue([inProgressRun]),
+            workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+          };
 
-        const messages: Array<string> = [];
-        const waiter = new Waiter(
-          workflow.id,
-          // @ts-ignore
-          githubClient,
-          input,
-          (message: string) => {
-            messages.push(message);
-          },
-          () => {},
-        );
-        await expect(waiter.wait()).rejects.toMatchObject({
-          name: 'Error',
-          message: 'Aborted after waiting 1 seconds',
-        });
-        assert.deepEqual(messages, ['✋Awaiting run  ...', '🛑Exceeded wait seconds. Aborting...']);
+          const messages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow.id,
+            waiterClient(githubClient),
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            () => {},
+          );
+          const waitPromise = waiter.wait();
+          const assertion = expect(waitPromise).rejects.toMatchObject({
+            name: 'Error',
+            message: 'Aborted after waiting 1 seconds',
+          });
+
+          await vi.advanceTimersByTimeAsync(1000);
+
+          await assertion;
+          assert.deepEqual(messages, [
+            '✋Awaiting run  ...',
+            '🛑Exceeded wait seconds. Aborting...',
+          ]);
+        } finally {
+          vi.useRealTimers();
+        }
       });
 
       it('will abort immediately when abort-after-seconds is zero', async () => {
@@ -144,8 +166,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -181,8 +202,7 @@ describe('wait', () => {
           const messages: Array<string> = [];
           const waiter = new Waiter(
             workflow.id,
-            // @ts-ignore
-            githubClient,
+            waiterClient(githubClient),
             input,
             (message: string) => {
               messages.push(message);
@@ -199,6 +219,66 @@ describe('wait', () => {
 
           await assertion;
           expect(messages).toEqual(['🛑Exceeded wait seconds. Aborting...']);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it('logs a non-Error current-run lookup failure and falls back to discovered runs', async () => {
+        const debugMessages: string[] = [];
+        const githubClient = waiterClient({
+          run: vi.fn().mockRejectedValue('not found'),
+          runs: vi.fn().mockResolvedValue([]),
+        });
+        const waiter = new Waiter(
+          workflow.id,
+          githubClient,
+          input,
+          () => {},
+          (message) => debugMessages.push(message),
+        );
+
+        await waiter.wait();
+
+        expect(debugMessages).toContain('Failed to fetch current run 2: not found');
+        expect(githubClient.runs).toHaveBeenCalledOnce();
+      });
+
+      it('forwards one abort signal to run discovery and clears its timeout after success', async () => {
+        vi.useFakeTimers();
+        try {
+          input.abortAfterSeconds = 10;
+          input.queueName = 'deploy';
+          const currentRun = {
+            id: input.runId,
+            run_attempt: input.runAttempt,
+            status: 'in_progress',
+            html_url: 'current-run',
+            created_at: '2026-05-03T10:00:00Z',
+            run_started_at: '2026-05-03T10:00:00Z',
+          };
+          const run = vi.fn().mockResolvedValue(currentRun);
+          const runs = vi.fn().mockResolvedValue([currentRun]);
+          const activeRunsForRepo = vi.fn().mockResolvedValue([currentRun]);
+          const infoMessages: string[] = [];
+          const waiter = new Waiter(
+            workflow.id,
+            waiterClient({ run, runs, activeRunsForRepo }),
+            input,
+            (message) => infoMessages.push(message),
+            () => {},
+          );
+
+          await waiter.wait();
+
+          const runSignal = run.mock.calls[0][3].signal;
+          expect(runSignal).toBeInstanceOf(AbortSignal);
+          expect(runs.mock.calls[0][4].signal).toBe(runSignal);
+          expect(activeRunsForRepo.mock.calls[0][3].signal).toBe(runSignal);
+
+          await vi.advanceTimersByTimeAsync(10_000);
+          expect(runSignal.aborted).toBe(false);
+          expect(infoMessages).not.toContain('🛑Exceeded wait seconds. Aborting...');
         } finally {
           vi.useRealTimers();
         }
@@ -223,8 +303,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -282,8 +361,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -324,8 +402,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -377,8 +454,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -436,8 +512,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -492,8 +567,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -549,8 +623,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -595,8 +668,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -643,8 +715,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -686,8 +757,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -733,8 +803,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -811,8 +880,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -826,58 +894,64 @@ describe('wait', () => {
       });
 
       it('will retry to get previous runs, if not found during first try', async () => {
-        // see discussions in https://github.com/vitest-dev/vitest/discussions/7890
-        vi.setConfig({ testTimeout: 10_1000 });
-        input.initialWaitSeconds = 2;
-        // give the current run a random id
-        input.runId = 2;
+        vi.useFakeTimers();
+        try {
+          input.initialWaitSeconds = 2;
+          // give the current run a random id
+          input.runId = 2;
 
-        const run = {
-          id: 1,
-          status: 'in_progress',
-          html_url: '1',
-        };
-        const completedRun = {
-          ...run,
-          status: 'completed',
-          conclusion: 'success',
-        };
+          const run = {
+            id: 1,
+            status: 'in_progress',
+            html_url: '1',
+          };
+          const completedRun = {
+            ...run,
+            status: 'completed',
+            conclusion: 'success',
+          };
 
-        const mockedRunsFunc = vi
-          .fn()
-          // don't return any runs in the first attempt
-          .mockReturnValueOnce(Promise.resolve([]))
-          // return the inprogress run
-          .mockReturnValueOnce(Promise.resolve([run]))
-          // then return the same run as completed
-          .mockReturnValue(Promise.resolve([completedRun]));
+          const mockedRunsFunc = vi
+            .fn()
+            // don't return any runs in the first attempt
+            .mockReturnValueOnce(Promise.resolve([]))
+            // return the inprogress run
+            .mockReturnValueOnce(Promise.resolve([run]))
+            // then return the same run as completed
+            .mockReturnValue(Promise.resolve([completedRun]));
 
-        const githubClient = {
-          runs: mockedRunsFunc,
-          workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
-        };
+          const githubClient = {
+            runs: mockedRunsFunc,
+            workflows: async (owner: string, repo: string) => Promise.resolve([workflow]),
+          };
 
-        const messages: Array<string> = [];
-        const waiter = new Waiter(
-          workflow.id,
-          // @ts-ignore
-          githubClient,
-          input,
-          (message: string) => {
-            messages.push(message);
-          },
-          () => {},
-        );
-        await waiter.wait();
-        assert.deepStrictEqual(messages, [
-          `🔎 Waiting for ${input.initialWaitSeconds} seconds before checking for runs again...`,
-          '✋Awaiting run 1 ...',
-        ]);
+          const messages: Array<string> = [];
+          const waiter = new Waiter(
+            workflow.id,
+            waiterClient(githubClient),
+            input,
+            (message: string) => {
+              messages.push(message);
+            },
+            () => {},
+          );
+          const waitPromise = waiter.wait();
+
+          await vi.advanceTimersByTimeAsync(3000);
+          await waitPromise;
+
+          assert.deepStrictEqual(messages, [
+            `🔎 Waiting for ${input.initialWaitSeconds} seconds before checking for runs again...`,
+            '✋Awaiting run 1 ...',
+          ]);
+        } finally {
+          vi.useRealTimers();
+        }
       });
 
       it('will wait for a specific job to complete if wait-for-job is defined', async () => {
         input.jobToWaitFor = 'test-job';
-        input.pollIntervalSeconds = 1;
+        input.pollIntervalSeconds = 0;
         const run = {
           id: 1,
           status: 'in_progress',
@@ -891,12 +965,7 @@ describe('wait', () => {
         };
 
         const githubClient = {
-          runs: async (
-            owner: string,
-            repo: string,
-            branch: string | undefined,
-            workflowId: number,
-          ) => Promise.resolve([run]),
+          runs: vi.fn().mockResolvedValue([run]),
           jobs: vi
             .fn()
             .mockResolvedValueOnce([job])
@@ -907,8 +976,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -981,8 +1049,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -1000,7 +1067,7 @@ describe('wait', () => {
       it('will wait for a specific step to complete if wait-for-step is defined', async () => {
         input.jobToWaitFor = 'test-job';
         input.stepToWaitFor = 'test-step';
-        input.pollIntervalSeconds = 1;
+        input.pollIntervalSeconds = 0;
         const run = {
           id: 1,
           status: 'in_progress',
@@ -1020,12 +1087,7 @@ describe('wait', () => {
         };
 
         const githubClient = {
-          runs: async (
-            owner: string,
-            repo: string,
-            branch: string | undefined,
-            workflowId: number,
-          ) => Promise.resolve([run]),
+          runs: vi.fn().mockResolvedValue([run]),
           jobs: vi.fn().mockResolvedValue([job]),
           steps: vi
             .fn()
@@ -1037,8 +1099,7 @@ describe('wait', () => {
         const messages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             messages.push(message);
@@ -1055,10 +1116,47 @@ describe('wait', () => {
         expect(setOutputMock).toHaveBeenCalledWith('previous_run_url', '1');
       });
 
+      it('falls back to the job when the requested step is missing', async () => {
+        input.jobToWaitFor = 'test-job';
+        input.stepToWaitFor = 'missing-step';
+        input.pollIntervalSeconds = 0;
+        const run = {
+          id: 1,
+          status: 'in_progress',
+          html_url: 'run-url',
+        };
+        const job = {
+          id: 7,
+          name: 'test-job',
+          status: 'in_progress',
+          html_url: 'job-url',
+        };
+        const githubClient = waiterClient({
+          runs: vi.fn().mockResolvedValueOnce([run]).mockResolvedValue([]),
+          jobs: vi.fn().mockResolvedValue([job]),
+          steps: vi.fn().mockResolvedValue([{ number: 1, name: 'other-step' }]),
+        });
+        const messages: string[] = [];
+        const waiter = new Waiter(
+          workflow.id,
+          githubClient,
+          input,
+          (message) => messages.push(message),
+          () => {},
+        );
+
+        await waiter.wait();
+
+        expect(messages).toEqual([
+          'Step missing-step not found in job 7, awaiting full run for safety',
+          '✋Awaiting job run completion from job job-url ...',
+        ]);
+      });
+
       it('will await the full run if the job is not found', async () => {
         input.runId = 2;
         input.jobToWaitFor = 'test-job';
-        input.pollIntervalSeconds = 1;
+        input.pollIntervalSeconds = 0;
         const run = {
           id: 1,
           status: 'in_progress',
@@ -1090,8 +1188,7 @@ describe('wait', () => {
         const infoMessages: Array<string> = [];
         const waiter = new Waiter(
           workflow.id,
-          // @ts-ignore
-          githubClient,
+          waiterClient(githubClient),
           input,
           (message: string) => {
             infoMessages.push(message);
@@ -1135,6 +1232,7 @@ describe('wait', () => {
             stepToWaitFor: undefined,
             initialWaitSeconds: 0,
             queueName: undefined,
+            retries: 0,
           };
         });
 
@@ -1175,8 +1273,7 @@ describe('wait', () => {
           const debugMessages: Array<string> = [];
           const waiter = new Waiter(
             workflow1.id,
-            // @ts-ignore
-            githubClient,
+            waiterClient(githubClient),
             input,
             (message: string) => {
               messages.push(message);
@@ -1184,7 +1281,6 @@ describe('wait', () => {
             (message: string) => {
               debugMessages.push(message);
             },
-            [workflow1, workflow2],
           );
 
           await waiter.wait();
@@ -1252,8 +1348,7 @@ describe('wait', () => {
           const debugMessages: Array<string> = [];
           const waiter = new Waiter(
             workflow1.id,
-            // @ts-ignore
-            githubClient,
+            waiterClient(githubClient),
             input,
             (message: string) => {
               messages.push(message);
@@ -1261,7 +1356,6 @@ describe('wait', () => {
             (message: string) => {
               debugMessages.push(message);
             },
-            [workflow1, workflow2],
           );
 
           await waiter.wait();
@@ -1300,8 +1394,7 @@ describe('wait', () => {
           const debugMessages: Array<string> = [];
           const waiter = new Waiter(
             workflow1.id,
-            // @ts-ignore
-            githubClient,
+            waiterClient(githubClient),
             input,
             (message: string) => {
               messages.push(message);
@@ -1309,7 +1402,6 @@ describe('wait', () => {
             (message: string) => {
               debugMessages.push(message);
             },
-            [workflow1],
           );
 
           await waiter.wait();
@@ -1350,8 +1442,7 @@ describe('wait', () => {
           const debugMessages: Array<string> = [];
           const waiter = new Waiter(
             workflow1.id,
-            // @ts-ignore
-            githubClient,
+            waiterClient(githubClient),
             input,
             (message: string) => {
               messages.push(message);
@@ -1359,7 +1450,6 @@ describe('wait', () => {
             (message: string) => {
               debugMessages.push(message);
             },
-            [workflow1, workflow2],
           );
 
           await waiter.wait();
@@ -1393,8 +1483,7 @@ describe('wait', () => {
           const debugMessages: Array<string> = [];
           const waiter = new Waiter(
             workflow1.id,
-            // @ts-ignore
-            githubClient,
+            waiterClient(githubClient),
             input,
             (message: string) => {
               messages.push(message);
@@ -1402,7 +1491,6 @@ describe('wait', () => {
             (message: string) => {
               debugMessages.push(message);
             },
-            manyWorkflows,
           );
 
           await waiter.wait();
@@ -1445,8 +1533,7 @@ describe('wait', () => {
           const debugMessages: Array<string> = [];
           const waiter = new Waiter(
             workflow1.id,
-            // @ts-ignore
-            githubClient,
+            waiterClient(githubClient),
             input,
             (message: string) => {
               messages.push(message);
@@ -1454,7 +1541,6 @@ describe('wait', () => {
             (message: string) => {
               debugMessages.push(message);
             },
-            [workflow1, workflow2],
           );
           await waiter.wait();
 
@@ -1490,8 +1576,7 @@ describe('wait', () => {
           const debugMessages: Array<string> = [];
           const waiter = new Waiter(
             workflow1.id,
-            // @ts-ignore
-            githubClient,
+            waiterClient(githubClient),
             input,
             (message: string) => {
               messages.push(message);
@@ -1499,7 +1584,6 @@ describe('wait', () => {
             (message: string) => {
               debugMessages.push(message);
             },
-            [workflow1, workflow2],
           );
           await waiter.wait();
 
