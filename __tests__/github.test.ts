@@ -1,7 +1,7 @@
 import { warning } from '@actions/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createThrottleOptions, OctokitGitHub, WorkflowRun } from '../src/github';
+import { createThrottleOptions, OctokitGitHub, type WorkflowRun } from '../src/github';
 
 vi.mock('@actions/core', () => ({
   debug: vi.fn(),
@@ -23,6 +23,16 @@ const run = (overrides: Partial<WorkflowRun>): WorkflowRun =>
   }) as WorkflowRun;
 
 type WorkflowRunPages = WorkflowRun[][];
+type PageMapper = (response: { data: WorkflowRun[] }, done: () => void) => WorkflowRun[];
+interface TestOctokit {
+  actions: Record<string, ReturnType<typeof vi.fn>>;
+  paginate: ReturnType<typeof vi.fn>;
+}
+
+const replaceOctokit = (client: OctokitGitHub, octokit: TestOctokit) => {
+  (client as unknown as { octokit: TestOctokit }).octokit = octokit;
+};
+
 const CLIENT_ERROR_STATUSES = Array.from({ length: 100 }, (_, index) => 400 + index);
 const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'];
 
@@ -30,68 +40,72 @@ const clientWithRunPages = (...pagesByCall: WorkflowRunPages[]) => {
   const client = new OctokitGitHub('fake-token');
   let paginateCalls = 0;
   let pagesScanned = 0;
-  const paginate = vi.fn(async (_endpoint, _options, mapFunction) => {
-    const pages = pagesByCall[paginateCalls] || [];
-    paginateCalls += 1;
-    const results: WorkflowRun[] = [];
-    let doneCalled = false;
-    const done = () => {
-      doneCalled = true;
-    };
+  const paginate = vi.fn(
+    async (_endpoint: unknown, _options: Record<string, unknown>, mapFunction: PageMapper) => {
+      const pages = pagesByCall[paginateCalls] || [];
+      paginateCalls += 1;
+      const results: WorkflowRun[] = [];
+      let doneCalled = false;
+      const done = () => {
+        doneCalled = true;
+      };
 
-    for (const page of pages) {
-      pagesScanned += 1;
-      results.push(...mapFunction({ data: page }, done));
-      if (doneCalled) {
-        break;
+      for (const page of pages) {
+        pagesScanned += 1;
+        results.push(...mapFunction({ data: page }, done));
+        if (doneCalled) {
+          break;
+        }
       }
-    }
 
-    return results;
-  });
+      return results;
+    },
+  );
 
-  (client as any).octokit = {
+  replaceOctokit(client, {
     actions: {
       listWorkflowRuns: vi.fn(),
       listWorkflowRunsForRepo: vi.fn(),
     },
     paginate,
-  };
+  });
 
   return { client, paginate, pagesScanned: () => pagesScanned };
 };
 
 const clientWithDynamicRunPages = (
-  pagesForOptions: (options: Record<string, any>) => WorkflowRunPages,
+  pagesForOptions: (options: Record<string, unknown>) => WorkflowRunPages,
 ) => {
   const client = new OctokitGitHub('fake-token');
   let pagesScanned = 0;
-  const paginate = vi.fn(async (_endpoint, options, mapFunction) => {
-    const pages = pagesForOptions(options);
-    const results: WorkflowRun[] = [];
-    let doneCalled = false;
-    const done = () => {
-      doneCalled = true;
-    };
+  const paginate = vi.fn(
+    async (_endpoint: unknown, options: Record<string, unknown>, mapFunction: PageMapper) => {
+      const pages = pagesForOptions(options);
+      const results: WorkflowRun[] = [];
+      let doneCalled = false;
+      const done = () => {
+        doneCalled = true;
+      };
 
-    for (const page of pages) {
-      pagesScanned += 1;
-      results.push(...mapFunction({ data: page }, done));
-      if (doneCalled) {
-        break;
+      for (const page of pages) {
+        pagesScanned += 1;
+        results.push(...mapFunction({ data: page }, done));
+        if (doneCalled) {
+          break;
+        }
       }
-    }
 
-    return results;
-  });
+      return results;
+    },
+  );
 
-  (client as any).octokit = {
+  replaceOctokit(client, {
     actions: {
       listWorkflowRuns: vi.fn(),
       listWorkflowRunsForRepo: vi.fn(),
     },
     paginate,
-  };
+  });
 
   return { client, paginate, pagesScanned: () => pagesScanned };
 };
@@ -124,7 +138,109 @@ describe('github', () => {
     });
   });
 
+  describe('API wrappers', () => {
+    it('paginates workflows with repository coordinates', async () => {
+      const listRepoWorkflows = vi.fn();
+      const paginate = vi.fn().mockResolvedValue([{ id: 123, name: 'CI' }]);
+      const client = new OctokitGitHub('fake-token');
+      replaceOctokit(client, {
+        actions: { listRepoWorkflows },
+        paginate,
+      });
+
+      await expect(client.workflows('org', 'repo')).resolves.toEqual([{ id: 123, name: 'CI' }]);
+      expect(paginate).toHaveBeenCalledWith(listRepoWorkflows, {
+        owner: 'org',
+        repo: 'repo',
+        per_page: 100,
+      });
+    });
+
+    it('fetches a workflow run with and without an abort signal', async () => {
+      const workflowRun = run({ id: 42, status: 'in_progress', conclusion: null });
+      const getWorkflowRun = vi.fn().mockResolvedValue({ data: workflowRun });
+      const client = new OctokitGitHub('fake-token');
+      replaceOctokit(client, {
+        actions: { getWorkflowRun },
+        paginate: vi.fn(),
+      });
+
+      await expect(client.run('org', 'repo', 42)).resolves.toBe(workflowRun);
+      const signal = new AbortController().signal;
+      await expect(client.run('org', 'repo', 42, { signal })).resolves.toBe(workflowRun);
+
+      expect(getWorkflowRun).toHaveBeenNthCalledWith(1, {
+        owner: 'org',
+        repo: 'repo',
+        run_id: 42,
+      });
+      expect(getWorkflowRun).toHaveBeenNthCalledWith(2, {
+        owner: 'org',
+        repo: 'repo',
+        run_id: 42,
+        request: { signal },
+      });
+    });
+
+    it('paginates jobs and returns present or missing job steps', async () => {
+      const listJobsForWorkflowRun = vi.fn();
+      const getJobForWorkflowRun = vi
+        .fn()
+        .mockResolvedValueOnce({ data: { steps: [{ number: 1, name: 'Build' }] } })
+        .mockResolvedValueOnce({ data: {} });
+      const paginate = vi.fn().mockResolvedValue([{ id: 7, name: 'build' }]);
+      const client = new OctokitGitHub('fake-token');
+      replaceOctokit(client, {
+        actions: { listJobsForWorkflowRun, getJobForWorkflowRun },
+        paginate,
+      });
+
+      await expect(client.jobs('org', 'repo', 42)).resolves.toEqual([{ id: 7, name: 'build' }]);
+      expect(paginate).toHaveBeenCalledWith(listJobsForWorkflowRun, {
+        owner: 'org',
+        repo: 'repo',
+        run_id: 42,
+        per_page: 100,
+      });
+      await expect(client.steps('org', 'repo', 7)).resolves.toEqual([{ number: 1, name: 'Build' }]);
+      await expect(client.steps('org', 'repo', 8)).resolves.toEqual([]);
+      expect(getJobForWorkflowRun).toHaveBeenNthCalledWith(2, {
+        owner: 'org',
+        repo: 'repo',
+        job_id: 8,
+      });
+    });
+  });
+
   describe('runs', () => {
+    it('de-duplicates the same active run returned by multiple status queries', async () => {
+      const duplicateRun = run({ id: 7, status: 'queued', conclusion: null });
+      const { client } = clientWithRunPages([[duplicateRun]], [[duplicateRun]], []);
+
+      await expect(client.runs('org', 'repo', 123)).resolves.toEqual([duplicateRun]);
+    });
+
+    it('matches queue names against the workflow name and excludes inactive runs', async () => {
+      const matchingRun = run({
+        id: 1,
+        status: 'queued',
+        conclusion: null,
+        display_title: 'other-title',
+        name: 'deploy-api',
+      });
+      const completedRun = run({
+        id: 2,
+        status: 'completed',
+        conclusion: 'success',
+        display_title: 'deploy-api',
+      });
+      const { client } = clientWithRunPages([], [[matchingRun, completedRun]], []);
+
+      await expect(client.runs('org', 'repo', 123, { queueName: 'deploy-api' })).resolves.toEqual([
+        matchingRun,
+      ]);
+    });
+
     it('does not perform an unfiltered historical walk when only active runs can be eligible', async () => {
       const completedHistoricalPages = Array.from({ length: 51 }, (_, pageIndex) =>
         Array.from({ length: 100 }, (_, runIndex) =>
@@ -319,6 +435,16 @@ describe('github', () => {
       expect(warning).toHaveBeenCalledWith(
         'Secondary rate limit detected for request GET /secondary-limited',
       );
+    });
+
+    it('does not retry after the first primary rate-limit retry', () => {
+      const throttleOptions = createThrottleOptions();
+
+      expect(
+        throttleOptions.onRateLimit(30, { method: 'GET', url: '/rate-limited' }, {}, 1),
+      ).toBeUndefined();
+      expect(warning).toHaveBeenCalledWith('Request quota exhausted for request GET /rate-limited');
+      expect(warning).not.toHaveBeenCalledWith('Retrying after 30 seconds!');
     });
   });
 });

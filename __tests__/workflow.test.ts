@@ -34,5 +34,45 @@ describe('workflow', () => {
 
       assert.equal(findWorkflowId(workflows, input), 1);
     });
+
+    it('falls back to workflow name when the requested path does not match', () => {
+      const workflows = [
+        { id: 1, name: 'CI', path: '.github/workflows/main.yml' },
+        { id: 2, name: 'Other', path: '.github/workflows/other.yml' },
+      ];
+      const input = parseInput({
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'softprops/turnstyle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_WORKFLOW_REF: 'softprops/turnstyle/.github/workflows/missing.yml@refs/heads/main',
+        GITHUB_RUN_ID: '1',
+        INPUT_TOKEN: 's3cr3t',
+      });
+
+      assert.equal(findWorkflowId(workflows, input), 1);
+    });
+
+    it.each([
+      ['an empty workflow list', []],
+      ['workflows with null metadata', [{ id: 1, name: null, path: null }]],
+      ['workflows with missing metadata', [{ id: 1 }]],
+      [
+        'duplicate non-matching names',
+        [
+          { id: 1, name: 'Other' },
+          { id: 2, name: 'Other' },
+        ],
+      ],
+    ])('returns undefined for %s', (_description, workflows) => {
+      const input = parseInput({
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'softprops/turnstyle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_RUN_ID: '1',
+        INPUT_TOKEN: 's3cr3t',
+      });
+
+      assert.equal(findWorkflowId(workflows, input), undefined);
+    });
   });
 });

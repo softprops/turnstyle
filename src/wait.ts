@@ -1,6 +1,12 @@
 import { setOutput } from '@actions/core';
-import { OctokitGitHub as GitHub, WorkflowRun } from './github';
-import { Input } from './input';
+import type {
+  GitHubRequestOptions,
+  WorkflowJob,
+  WorkflowRun,
+  WorkflowRunFilters,
+  WorkflowStep,
+} from './github';
+import type { Input } from './input';
 
 const ACTIVE_RUN_STATUSES = new Set(['in_progress', 'queued', 'waiting']);
 const MAX_PREVIOUS_WORKFLOW_RUNS = 500;
@@ -92,33 +98,57 @@ const outputPreviousRun = (run: WorkflowRun | undefined) => {
   setOutput('previous_run_url', run?.html_url || '');
 };
 
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+export interface WaiterGitHubClient {
+  run(
+    owner: string,
+    repo: string,
+    runId: number,
+    requestOptions?: GitHubRequestOptions,
+  ): Promise<WorkflowRun>;
+  runs(
+    owner: string,
+    repo: string,
+    workflowId: number,
+    filters?: WorkflowRunFilters,
+    requestOptions?: GitHubRequestOptions,
+  ): Promise<WorkflowRun[]>;
+  activeRunsForRepo(
+    owner: string,
+    repo: string,
+    filters?: WorkflowRunFilters,
+    requestOptions?: GitHubRequestOptions,
+  ): Promise<WorkflowRun[]>;
+  jobs(owner: string, repo: string, runId: number): Promise<WorkflowJob[]>;
+  steps(owner: string, repo: string, jobId: number): Promise<WorkflowStep[]>;
+}
+
 export interface Wait {
-  wait(secondsSoFar?: number): Promise<number>;
+  wait(secondsSoFar?: number): Promise<number | undefined>;
 }
 
 export class Waiter implements Wait {
   private readonly info: (msg: string) => void;
   private readonly debug: (msg: string) => void;
-  private input: Input;
-  private githubClient: GitHub;
-  private readonly workflowId: any;
-  private readonly allWorkflows: any[];
+  private readonly input: Input;
+  private readonly githubClient: WaiterGitHubClient;
+  private readonly workflowId: number;
   private previousRunOutput: WorkflowRun | undefined;
 
   constructor(
-    workflowId: any,
-    githubClient: GitHub,
+    workflowId: number,
+    githubClient: WaiterGitHubClient,
     input: Input,
     info: (msg: string) => void,
     debug: (msg: string) => void,
-    allWorkflows: any[] = [],
   ) {
     this.workflowId = workflowId;
     this.input = input;
     this.githubClient = githubClient;
     this.info = info;
     this.debug = debug;
-    this.allWorkflows = allWorkflows;
   }
 
   private setPreviousRunOutput = (run: WorkflowRun) => {
@@ -179,7 +209,7 @@ export class Waiter implements Wait {
     }
   };
 
-  wait = async (secondsSoFar?: number) => {
+  wait = async (secondsSoFar?: number): Promise<number | undefined> => {
     const elapsedSeconds = secondsSoFar || 0;
 
     if (
@@ -215,8 +245,8 @@ export class Waiter implements Wait {
                 requestOptions,
               )
             : await this.githubClient.run(this.input.owner, this.input.repo, this.input.runId);
-        } catch (error: any) {
-          this.debug(`Failed to fetch current run ${this.input.runId}: ${error.message}`);
+        } catch (error: unknown) {
+          this.debug(`Failed to fetch current run ${this.input.runId}: ${errorMessage(error)}`);
         }
 
         const runFilters = {
@@ -380,7 +410,7 @@ export class Waiter implements Wait {
     return this.pollAndWait(secondsSoFar);
   };
 
-  pollAndWait = async (secondsSoFar?: number) => {
+  pollAndWait = async (secondsSoFar?: number): Promise<number | undefined> => {
     await new Promise((resolve) => setTimeout(resolve, this.input.pollIntervalSeconds * 1000));
     return this.wait((secondsSoFar || 0) + this.input.pollIntervalSeconds);
   };
