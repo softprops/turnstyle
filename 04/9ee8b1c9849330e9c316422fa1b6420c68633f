@@ -1,0 +1,26 @@
+package.json
+  s_439166ceaa60f0::t_0bd1b905a5d1fc 46
+  s_439166ceaa60f0::t_7c13f6363f6fe1 3
+CHANGELOG.md
+  s_439166ceaa60f0::t_cfdc1973b43d3a 3-13
+dist/index.js
+  s_439166ceaa60f0::t_4e5fa240c95c6a 1-5,7,10,13-14,16,18,22,24,26-27,29,34,36-37,40-41,44-46,56-58
+package-lock.json
+  s_439166ceaa60f0::t_ce8432b062b1ae 3,9,2893-2895
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "049ee8b1c9849330e9c316422fa1b6420c68633f",
+  "prompts": {},
+  "sessions": {
+    "s_439166ceaa60f0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58fb-f18a-7b70-a1a1-3e9f6ebc90f5",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
