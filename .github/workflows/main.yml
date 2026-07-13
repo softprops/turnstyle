@@ -30,6 +30,8 @@ jobs:
 
       - name: Install
         run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
       - name: Build
         run: npm run build
       - name: Check bundled action
