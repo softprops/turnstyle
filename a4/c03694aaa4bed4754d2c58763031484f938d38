@@ -1,0 +1,23 @@
+.github/workflows/main.yml
+  s_439166ceaa60f0::t_7570e617df3c1a 33-34
+package-lock.json
+  s_439166ceaa60f0::t_8af60d73442d3b 24,1171-1510,2858-2860,2864,2867-2889
+package.json
+  s_439166ceaa60f0::t_af27fa29c4f1ba 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "a4c03694aaa4bed4754d2c58763031484f938d38",
+  "prompts": {},
+  "sessions": {
+    "s_439166ceaa60f0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58fb-f18a-7b70-a1a1-3e9f6ebc90f5",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
