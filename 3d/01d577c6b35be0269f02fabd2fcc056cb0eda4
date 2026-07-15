@@ -1,0 +1,79 @@
+__tests__/github.test.ts
+  s_87941aaa79a704::t_d157d8710d0509 142,144-147,155-159,164-168
+  s_02b554e3d6d4ae::t_401de1fd604ed2 169
+__tests__/main.test.ts
+  s_87941aaa79a704::t_c4974f944becfe 1,4,45,159-188,190-214,218-262
+  s_02b554e3d6d4ae::t_bb3349aa5ec75e 71,97-102,189,215
+  s_02b554e3d6d4ae::t_5d9fa869794d50 216-217
+  s_b2ce6710e92514::t_df40171eb57f70 263-264
+src/main.ts
+  s_87941aaa79a704::t_550c4c3fd4242c 1,3,10-14,18-24,28-30,38,40,43,49,52-56,58,61-64,66,72-85
+__tests__/wait/deadline.test.ts
+  s_87941aaa79a704::t_29ded355bfc431 133-151
+src/github.ts
+  s_87941aaa79a704::t_5f658f43177c98 97
+  s_87941aaa79a704::t_4d94a0bb0a7adc 92
+src/deadline.ts
+  s_02b554e3d6d4ae::t_96a38b5e322f38 184,199,208-209
+  s_02b554e3d6d4ae::t_61072df21a3111 149-150,152,158-159,172
+  s_02b554e3d6d4ae::t_aa8d58a95c808e 10-14,29,41-44,46-47,49-53,55,62-67,69-70,72,78-85,87,89,92,96-100,102-104,106-110,113-114,116-117,127-129,132-134,140-143,145,148,151,153-154,157,163,166-170,174-179,181,185,187-190,193-198,200-203,214
+  s_02b554e3d6d4ae::t_60e8ebd1d4e5c8 171,173
+  s_87941aaa79a704::t_e3eb6fee9b0e9e 1-9,15-22,24-28,31-40,45,48,54,56,71,75-76,86,88,90-91,93,101,105,111-112,118-126,130-131,135-139,144,146-147,155,161-162,180,182-183,186,191-192,204-207,210,213,215-220
+  s_02b554e3d6d4ae::t_9da40acbafc9cf 23,57-61,68,73-74,77,94,156,160,164,211-212,221-238
+  s_02b554e3d6d4ae::t_d99fd397c61735 30,115,165
+  s_87941aaa79a704::t_f2bc99e65a6d93 95
+README.md
+  s_02b554e3d6d4ae::t_cba66d4241dfdf 55-56,267-268
+__tests__/wait.test.ts
+  s_02b554e3d6d4ae::t_ebd6527982210f 944
+CHANGELOG.md
+  s_02b554e3d6d4ae::t_cba66d4241dfdf 5-6
+AGENTS.md
+  s_02b554e3d6d4ae::t_cba66d4241dfdf 23-26
+action.yml
+  s_02b554e3d6d4ae::t_cba66d4241dfdf 18,20
+src/wait.ts
+  s_87941aaa79a704::t_0abd9f26a90b23 2-8,155-156,158,166-167,175,198,201,320-323,326,328,409-411,415,417,420-421,425-427,433-437
+  s_87941aaa79a704::t_f2bc99e65a6d93 324
+__tests__/deadline.test.ts
+  s_02b554e3d6d4ae::t_5d9fa869794d50 115
+  s_02b554e3d6d4ae::t_28f550b5b94608 116-118,120-124,128,130-134,136-137
+  s_87941aaa79a704::t_c4974f944becfe 1-85,87-102,104-114,138-150,164-188
+  s_02b554e3d6d4ae::t_9da40acbafc9cf 119
+  s_02b554e3d6d4ae::t_61072df21a3111 151-163
+  s_02b554e3d6d4ae::t_bb3349aa5ec75e 86,103,125-127,129,135
+dist/index.js
+  s_02b554e3d6d4ae::t_4b843db65abf45 1-5,7,10,13-14,16,18,22,27,29,34,40-41,45-46,56,58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3d01d577c6b35be0269f02fabd2fcc056cb0eda4",
+  "prompts": {},
+  "sessions": {
+    "s_02b554e3d6d4ae": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6568-eb12-7e20-af22-f175c963568d",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_87941aaa79a704": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6569-1f13-7b83-a72a-d4c5039245fc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_b2ce6710e92514": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f52de-e693-74d2-aefb-e8d96bda2cf9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
