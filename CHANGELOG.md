@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug fixes 🐛
+
+- Enforce `continue-after-seconds` and `abort-after-seconds` as total elapsed-time deadlines across workflow discovery, job and step reads, initial waiting, and polling.
+
 ## 3.3.2
 
 ### Bug fixes 🐛

@@ -12,6 +12,7 @@ vi.mock('@actions/core', () => ({
   debug: vi.fn(),
   info: vi.fn(),
   setFailed: vi.fn(),
+  setOutput: vi.fn(),
 }));
 
 const environment = (
@@ -40,6 +41,7 @@ const actionClient = (overrides: Partial<ActionGitHubClient> = {}): ActionGitHub
 
 describe('main', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -68,6 +70,42 @@ describe('main', () => {
     expect(wait).toHaveBeenCalledOnce();
     expect(setFailed).not.toHaveBeenCalled();
     expect(debug).toHaveBeenCalledWith('Found 1 workflows in softprops/turnstyle');
+  });
+
+  it('uses the default GitHub client factory', async () => {
+    const response = new Response(
+      JSON.stringify({
+        total_count: 1,
+        workflows: [{ id: 123, name: 'CI', path: '.github/workflows/main.yml' }],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+    Object.defineProperty(response, 'url', {
+      value: 'https://api.github.com/repos/softprops/turnstyle/actions/workflows',
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
+    const wait = vi.fn().mockResolvedValue(undefined);
+    const waiterFactory: WaiterFactory = vi.fn(() => ({ wait }));
+
+    await run(environment(), undefined, waiterFactory);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(setFailed).not.toHaveBeenCalled();
+    expect(waiterFactory).toHaveBeenCalledWith(123, expect.any(Object), expect.any(Object));
+    expect(wait).toHaveBeenCalledOnce();
+  });
+
+  it('uses the default waiter factory', async () => {
+    const runs = vi.fn().mockResolvedValue([]);
+    const github = actionClient({
+      workflows: async () => [{ id: 123, name: 'CI' }],
+      runs,
+    });
+
+    await run(environment(), () => github);
+
+    expect(runs).toHaveBeenCalledOnce();
+    expect(setFailed).not.toHaveBeenCalled();
   });
 
   it('reports a missing workflow without starting a waiter', async () => {

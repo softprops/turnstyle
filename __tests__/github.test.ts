@@ -210,6 +210,35 @@ describe('github', () => {
         job_id: 8,
       });
     });
+
+    it('forwards abort signals for job and step reads', async () => {
+      const listJobsForWorkflowRun = vi.fn();
+      const getJobForWorkflowRun = vi.fn().mockResolvedValue({ data: { steps: [] } });
+      const paginate = vi.fn().mockResolvedValue([]);
+      const client = new OctokitGitHub('fake-token');
+      replaceOctokit(client, {
+        actions: { listJobsForWorkflowRun, getJobForWorkflowRun },
+        paginate,
+      });
+      const signal = new AbortController().signal;
+
+      await client.jobs('org', 'repo', 42, { signal });
+      await client.steps('org', 'repo', 7, { signal });
+
+      expect(paginate).toHaveBeenCalledWith(listJobsForWorkflowRun, {
+        owner: 'org',
+        repo: 'repo',
+        run_id: 42,
+        per_page: 100,
+        request: { signal },
+      });
+      expect(getJobForWorkflowRun).toHaveBeenCalledWith({
+        owner: 'org',
+        repo: 'repo',
+        job_id: 7,
+        request: { signal },
+      });
+    });
   });
 
   describe('runs', () => {
@@ -418,6 +447,22 @@ describe('github', () => {
       expect(paginate).toHaveBeenCalledTimes(ACTIVE_RUN_STATUSES.length);
       expect(paginate.mock.calls.every(([, options]) => !('workflow_id' in options))).toBe(true);
       expect(paginate.mock.calls.map(([, options]) => options.status)).toEqual(ACTIVE_RUN_STATUSES);
+    });
+
+    it('forwards abort signals through workflow and repository run pagination', async () => {
+      const signal = new AbortController().signal;
+      const { client, paginate } = clientWithRunPages([], [], [], [], [], []);
+
+      await client.runs('org', 'repo', 123, {}, { signal });
+      await client.activeRunsForRepo('org', 'repo', {}, { signal });
+
+      expect(paginate).toHaveBeenCalledTimes(ACTIVE_RUN_STATUSES.length * 2);
+      expect(
+        paginate.mock.calls.every(([, options]) => {
+          const request = options.request as { signal?: AbortSignal } | undefined;
+          return request?.signal === signal;
+        }),
+      ).toBe(true);
     });
   });
 

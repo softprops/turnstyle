@@ -18,6 +18,12 @@
 - Do not reintroduce `@vercel/ncc` for routine builds; the current dependency set relies on package exports that ncc has previously failed to bundle correctly.
 - Keep the esbuild target aligned with the action runtime in `action.yml`.
 
+## Wait Deadlines
+
+- Treat `continue-after-seconds` and `abort-after-seconds` as monotonic total-elapsed-time deadlines across API reads and sleeps.
+- Propagate the shared deadline signal through every potentially blocking workflow-run, job, and step read.
+- Use fake timers for deadline regression tests; do not add real sleeps.
+
 ## Docs
 
 - Keep README inputs and outputs aligned with `action.yml` and the source input parsing.

@@ -1,0 +1,307 @@
+import { setOutput } from '@actions/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { WorkflowJob, WorkflowRun, WorkflowStep } from '../../src/github';
+import type { Input } from '../../src/input';
+import { Waiter, type WaiterGitHubClient } from '../../src/wait';
+
+vi.mock('@actions/core', () => ({
+  setOutput: vi.fn(),
+}));
+
+const workflowId = 123;
+
+const input = (overrides: Partial<Input> = {}): Input => ({
+  githubToken: 'fake-token',
+  owner: 'org',
+  repo: 'repo',
+  branch: 'master',
+  workflowName: 'CI',
+  workflowPath: undefined,
+  runId: 2,
+  runAttempt: 1,
+  pollIntervalSeconds: 60,
+  continueAfterSeconds: undefined,
+  abortAfterSeconds: undefined,
+  sameBranchOnly: false,
+  jobToWaitFor: undefined,
+  stepToWaitFor: undefined,
+  initialWaitSeconds: 0,
+  queueName: undefined,
+  retries: 0,
+  ...overrides,
+});
+
+const workflowRun = (overrides: Partial<WorkflowRun> = {}): WorkflowRun =>
+  ({
+    id: 1,
+    status: 'in_progress',
+    conclusion: null,
+    head_branch: 'master',
+    html_url: 'https://example.com/runs/1',
+    created_at: '2026-07-15T10:00:00Z',
+    run_started_at: '2026-07-15T10:00:00Z',
+    ...overrides,
+  }) as WorkflowRun;
+
+const workflowJob = (overrides: Partial<WorkflowJob> = {}): WorkflowJob =>
+  ({
+    id: 7,
+    name: 'deploy',
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://example.com/jobs/7',
+    ...overrides,
+  }) as WorkflowJob;
+
+const workflowStep = (overrides: Partial<WorkflowStep> = {}): WorkflowStep =>
+  ({
+    number: 1,
+    name: 'publish',
+    status: 'in_progress',
+    conclusion: null,
+    ...overrides,
+  }) as WorkflowStep;
+
+const deferredPromise = <T>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+};
+
+const client = (overrides: Partial<WaiterGitHubClient> = {}): WaiterGitHubClient => ({
+  run: async () => {
+    throw new Error('current run unavailable');
+  },
+  runs: async () => [],
+  activeRunsForRepo: async () => [],
+  jobs: async () => [],
+  steps: async () => [],
+  ...overrides,
+});
+
+const waiter = (waiterInput: Input, githubClient: WaiterGitHubClient, messages: string[] = []) =>
+  new Waiter(workflowId, githubClient, waiterInput, (message) => messages.push(message), vi.fn());
+
+const observeSettlement = <T>(promise: Promise<T>) => {
+  const settled = vi.fn();
+  void promise.then(
+    (value) => settled('fulfilled', value),
+    (error: unknown) => settled('rejected', error),
+  );
+  return settled;
+};
+
+describe('wait deadlines', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    vi.mocked(setOutput).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['abort', { abortAfterSeconds: 1 }, 'rejected'],
+    ['continue', { continueAfterSeconds: 1 }, 'fulfilled'],
+  ] as const)(
+    'enforces a one-second %s deadline during a longer poll interval',
+    async (_mode, timeoutInput, expectedState) => {
+      const waitPromise = waiter(
+        input({ ...timeoutInput, pollIntervalSeconds: 60 }),
+        client({ runs: vi.fn().mockResolvedValue([workflowRun()]) }),
+      ).wait();
+      const settled = observeSettlement(waitPromise);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(settled).toHaveBeenCalledWith(expectedState, expect.anything());
+      if (expectedState === 'rejected') {
+        await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+      } else {
+        await expect(waitPromise).resolves.toBe(1);
+      }
+    },
+  );
+
+  it('counts discovery time against the deadline before polling', async () => {
+    const currentRun = deferredPromise<WorkflowRun>();
+    const waitPromise = waiter(
+      input({ abortAfterSeconds: 1, pollIntervalSeconds: 60 }),
+      client({
+        run: vi.fn().mockReturnValue(currentRun.promise),
+        runs: vi.fn().mockResolvedValue([workflowRun()]),
+      }),
+    ).wait();
+    const settled = observeSettlement(waitPromise);
+
+    await vi.advanceTimersByTimeAsync(800);
+    currentRun.resolve(workflowRun({ id: 2 }));
+    await vi.advanceTimersByTimeAsync(199);
+    expect(settled).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(settled).toHaveBeenCalledWith('rejected', expect.any(Error));
+    await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+  });
+
+  it.each([
+    ['abort', { abortAfterSeconds: 1 }, 'rejected'],
+    ['continue', { continueAfterSeconds: 1 }, 'fulfilled'],
+  ] as const)(
+    'enforces a one-second %s deadline during a longer initial wait',
+    async (_mode, timeoutInput, expectedState) => {
+      const waitPromise = waiter(
+        input({ ...timeoutInput, initialWaitSeconds: 60 }),
+        client({ runs: vi.fn().mockResolvedValue([]) }),
+      ).wait();
+      const settled = observeSettlement(waitPromise);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(settled).toHaveBeenCalledWith(expectedState, expect.anything());
+      if (expectedState === 'rejected') {
+        await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+      } else {
+        await expect(waitPromise).resolves.toBe(1);
+      }
+    },
+  );
+
+  it('continues when workflow-run discovery is pending at the deadline', async () => {
+    const runs = vi.fn().mockReturnValue(new Promise<WorkflowRun[]>(() => {}));
+    const waitPromise = waiter(input({ continueAfterSeconds: 1 }), client({ runs })).wait();
+    const settled = observeSettlement(waitPromise);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(settled).toHaveBeenCalledWith('fulfilled', 1);
+    await expect(waitPromise).resolves.toBe(1);
+    expect(runs.mock.calls[0][4].signal.aborted).toBe(true);
+  });
+
+  it('aborts when repository queue discovery is pending at the deadline', async () => {
+    const activeRunsForRepo = vi.fn().mockReturnValue(new Promise<WorkflowRun[]>(() => {}));
+    const waitPromise = waiter(
+      input({ abortAfterSeconds: 1, queueName: 'deploy' }),
+      client({ runs: vi.fn().mockResolvedValue([]), activeRunsForRepo }),
+    ).wait();
+    const settled = observeSettlement(waitPromise);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(settled).toHaveBeenCalledWith('rejected', expect.any(Error));
+    await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+    expect(activeRunsForRepo.mock.calls[0][3].signal.aborted).toBe(true);
+  });
+
+  it('aborts a pending jobs request and forwards the deadline signal', async () => {
+    const jobs = vi.fn().mockReturnValue(new Promise<WorkflowJob[]>(() => {}));
+    const waitPromise = waiter(
+      input({ abortAfterSeconds: 1, jobToWaitFor: 'deploy' }),
+      client({ runs: vi.fn().mockResolvedValue([workflowRun()]), jobs }),
+    ).wait();
+    const settled = observeSettlement(waitPromise);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(settled).toHaveBeenCalledWith('rejected', expect.any(Error));
+    await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+    expect(jobs.mock.calls[0][3].signal.aborted).toBe(true);
+  });
+
+  it('aborts a pending steps request and forwards the deadline signal', async () => {
+    const steps = vi.fn().mockReturnValue(new Promise<WorkflowStep[]>(() => {}));
+    const waitPromise = waiter(
+      input({ abortAfterSeconds: 1, jobToWaitFor: 'deploy', stepToWaitFor: 'publish' }),
+      client({
+        runs: vi.fn().mockResolvedValue([workflowRun()]),
+        jobs: vi.fn().mockResolvedValue([workflowJob()]),
+        steps,
+      }),
+    ).wait();
+    const settled = observeSettlement(waitPromise);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(settled).toHaveBeenCalledWith('rejected', expect.any(Error));
+    await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+    expect(steps.mock.calls[0][3].signal.aborted).toBe(true);
+  });
+
+  it('keeps the deadline outcome when an API promise resolves immediately afterward', async () => {
+    const runs = deferredPromise<WorkflowRun[]>();
+    const messages: string[] = [];
+    const waitPromise = waiter(
+      input({ abortAfterSeconds: 1 }),
+      client({ runs: vi.fn().mockReturnValue(runs.promise) }),
+      messages,
+    ).wait();
+    const settled = observeSettlement(waitPromise);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    runs.resolve([]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(settled).toHaveBeenCalledWith('rejected', expect.any(Error));
+    await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+    expect(messages).toEqual(['🛑Exceeded wait seconds. Aborting...']);
+  });
+
+  it('cleans up the deadline timer after successful completion', async () => {
+    const run = vi.fn().mockResolvedValue(workflowRun({ id: 2 }));
+    const runs = vi.fn().mockResolvedValue([]);
+    const waitPromise = waiter(input({ abortAfterSeconds: 10 }), client({ run, runs })).wait();
+
+    await expect(waitPromise).resolves.toBeUndefined();
+
+    const signal = run.mock.calls[0][3].signal as AbortSignal;
+    expect(runs.mock.calls[0][4].signal).toBe(signal);
+    expect(signal.aborted).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(signal.aborted).toBe(false);
+  });
+
+  it('propagates API failures that happen before the deadline and cleans up', async () => {
+    const runs = vi.fn().mockRejectedValue(new Error('API unavailable'));
+    const waitPromise = waiter(input({ abortAfterSeconds: 10 }), client({ runs })).wait();
+
+    await expect(waitPromise).rejects.toThrow('API unavailable');
+
+    expect(runs.mock.calls[0][4].signal.aborted).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('reuses one deadline signal and leaves no timers after repeated polling', async () => {
+    const run = vi.fn().mockResolvedValue(workflowRun({ id: 3 }));
+    const runs = vi
+      .fn()
+      .mockResolvedValueOnce([workflowRun({ id: 2 })])
+      .mockResolvedValueOnce([workflowRun({ id: 1 })])
+      .mockResolvedValue([]);
+    const waitPromise = waiter(
+      input({ runId: 3, abortAfterSeconds: 10, pollIntervalSeconds: 1 }),
+      client({ run, runs }),
+    ).wait();
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(waitPromise).resolves.toBeUndefined();
+
+    const signals = [
+      ...run.mock.calls.map((call) => call[3].signal as AbortSignal),
+      ...runs.mock.calls.map((call) => call[4].signal as AbortSignal),
+    ];
+    expect(new Set(signals).size).toBe(1);
+    expect(signals[0].aborted).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});

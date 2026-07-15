@@ -1148,7 +1148,7 @@ describe('wait', () => {
         await waiter.wait();
 
         expect(messages).toEqual([
-          'Step missing-step not found in job 7, awaiting full run for safety',
+          'Step missing-step not found in job 7, awaiting job completion for safety',
           '✋Awaiting job run completion from job job-url ...',
         ]);
       });

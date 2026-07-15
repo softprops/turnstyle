@@ -17,7 +17,7 @@ export const createThrottleOptions = () => ({
     options: ThrottleRequestOptions,
     _octokit: unknown,
     retryCount: number,
-  ) => {
+  ): true | undefined => {
     warning(`Request quota exhausted for request ${options.method} ${options.url}`);
 
     if (retryCount < 1) {
@@ -25,6 +25,8 @@ export const createThrottleOptions = () => ({
       warning(`Retrying after ${retryAfter} seconds!`);
       return true;
     }
+
+    return undefined;
   },
   onSecondaryRateLimit: (_retryAfter: number, options: ThrottleRequestOptions) => {
     // does not retry, only logs a warning
@@ -204,23 +206,35 @@ export class OctokitGitHub {
     );
   };
 
-  jobs = async (owner: string, repo: string, run_id: number) => {
+  jobs = async (
+    owner: string,
+    repo: string,
+    run_id: number,
+    requestOptions: GitHubRequestOptions = {},
+  ) => {
     const options: Endpoints['GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs']['parameters'] =
       {
         owner,
         repo,
         run_id,
         per_page: 100,
+        ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
       };
 
     return this.octokit.paginate(this.octokit.actions.listJobsForWorkflowRun, options);
   };
 
-  steps = async (owner: string, repo: string, job_id: number) => {
+  steps = async (
+    owner: string,
+    repo: string,
+    job_id: number,
+    requestOptions: GitHubRequestOptions = {},
+  ) => {
     const options: Endpoints['GET /repos/{owner}/{repo}/actions/jobs/{job_id}']['parameters'] = {
       owner,
       repo,
       job_id,
+      ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
     };
     const { data: job } = await this.octokit.actions.getJobForWorkflowRun(options);
     return job.steps || [];

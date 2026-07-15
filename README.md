@@ -51,6 +51,10 @@ jobs:
 
 To avoid waiting prolonged periods of time, you may wish to bail on a run or continuing a workflow run regardless of the status of the previous run.
 
+The `continue-after-seconds` and `abort-after-seconds` limits measure total
+elapsed waiting time. Their deadlines include GitHub API discovery, job and
+step inspection, the initial wait, and polling sleeps.
+
 You can bail from a run using the built-in GitHub Actions [`jobs.<job_id>.timeout-minutes`](https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#jobsjob_idtimeout-minutes) setting
 
 ```diff
@@ -259,12 +263,12 @@ jobs:
 | Name                     | Type    | Description                                                                                                                                 |
 | ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `token`                  | string  | GitHub access token used for Actions API reads (defaults to `github.token`)                                                                 |
-| `continue-after-seconds` | number  | Maximum number of seconds to wait before moving forward (unbound by default). Mutually exclusive with abort-after-seconds                   |
-| `abort-after-seconds`    | number  | Maximum number of seconds to wait before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds              |
+| `continue-after-seconds` | number  | Maximum elapsed seconds, including API reads and sleeps, before moving forward (unbound by default). Mutually exclusive with abort-after-seconds |
+| `abort-after-seconds`    | number  | Maximum elapsed seconds, including API reads and sleeps, before aborting the job (unbound by default). Mutually exclusive with continue-after-seconds |
 | `poll-interval-seconds`  | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                                    |
 | `same-branch-only`       | boolean | Only wait on other runs from the same branch (defaults to true)                                                                             |
 | `branch`                 | string  | Branch name to use for same-branch filtering (defaults to the current branch)                                                               |
-| `initial-wait-seconds`   | number  | Total elapsed seconds within which period the action will refresh the list of current runs, if no runs were found in the first attempt      |
+| `initial-wait-seconds`   | number  | Total elapsed seconds within which the action refreshes current runs when none are found initially; bounded by any continue or abort deadline |
 | `job-to-wait-for`        | string  | Name of the workflow's job to wait for (unbound by default).                                                                                |
 | `step-to-wait-for`       | string  | Name of the step to wait for (unbound by default). Requires job-to-wait-for to be set.                                                      |
 | `queue-name`             | string  | Custom substring used to group matching runs across workflows (defaults to the current workflow only).                                      |
