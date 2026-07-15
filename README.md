@@ -54,7 +54,8 @@ To avoid waiting prolonged periods of time, you may wish to bail on a run or con
 The `continue-after-seconds` and `abort-after-seconds` limits measure total
 elapsed waiting time. The deadline starts after inputs are parsed and before
 the first Actions API read, then covers workflow and run discovery, job and
-step inspection, the initial wait, and polling sleeps.
+step inspection, configured API retry backoffs, the initial wait, and polling
+sleeps. A deadline cancels a queued retry wait through the same request signal.
 
 You can bail from a run using the built-in GitHub Actions [`jobs.<job_id>.timeout-minutes`](https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#jobsjob_idtimeout-minutes) setting
 

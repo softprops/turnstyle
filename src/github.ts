@@ -3,15 +3,15 @@ import { retry } from '@octokit/plugin-retry';
 import { throttling } from '@octokit/plugin-throttling';
 import { Octokit } from '@octokit/rest';
 import type { EndpointDefaults, Endpoints, RequestParameters } from '@octokit/types';
+import { retryRequest } from './retry';
 
 const ThrottledOctokit = Octokit.plugin(throttling, retry);
 const MAX_WORKFLOW_RUN_PAGES = 50;
 const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'] as const;
 const ACTIVE_RUN_STATUS_SET = new Set<string>(ACTIVE_RUN_STATUSES);
-const DO_NOT_RETRY_STATUS_CODES = Array.from({ length: 100 }, (_, index) => 400 + index);
 type ThrottleRequestOptions = Pick<Required<EndpointDefaults>, 'method' | 'url'>;
 
-export const createThrottleOptions = () => ({
+export const createThrottleOptions = (retryThroughPlugin: boolean = true) => ({
   onRateLimit: (
     retryAfter: number,
     options: ThrottleRequestOptions,
@@ -23,7 +23,7 @@ export const createThrottleOptions = () => ({
     if (retryCount < 1) {
       // only retries once
       warning(`Retrying after ${retryAfter} seconds!`);
-      return true;
+      return retryThroughPlugin ? true : undefined;
     }
 
     return undefined;
@@ -76,16 +76,33 @@ export class OctokitGitHub {
     this.octokit = new ThrottledOctokit({
       baseUrl: process.env['GITHUB_API_URL'] || 'https://api.github.com',
       auth: githubToken,
-      // retries defaults to 0, which disables the retry plugin entirely (no
-      // request wrapping). When set, it retries transient 5xx errors with
-      // backoff. All 4xx responses are excluded so permanent client errors and
-      // rate limits do not retry through plugin-retry.
+      // Turnstyle installs its equivalent request hook below so a shared
+      // action signal can cancel 5xx backoff. Disable plugin-retry's private
+      // Bottleneck timer while retaining the plugin dependency and API shape.
       retry: {
-        enabled: retries > 0,
-        retries,
-        doNotRetry: DO_NOT_RETRY_STATUS_CODES,
+        enabled: false,
       },
-      throttle: createThrottleOptions(),
+      // The callback keeps the existing warning behavior but declines the
+      // plugin's private retry timer. The request hook below applies the same
+      // retry policy through Turnstyle's abortable scheduler.
+      throttle: createThrottleOptions(false),
+    });
+
+    this.octokit.hook.wrap('request', (request, options) => {
+      return retryRequest(
+        (retryCount) =>
+          Promise.resolve(
+            request({
+              ...options,
+              request: {
+                ...options.request,
+                retryCount,
+              },
+            }),
+          ),
+        retries,
+        options.request.signal,
+      );
     });
   }
 

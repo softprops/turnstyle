@@ -4,6 +4,7 @@
 
 - Enforce `continue-after-seconds` and `abort-after-seconds` as total elapsed-time deadlines starting before the first Actions API read and covering workflow discovery, job and step reads, initial waiting, and polling.
 - Safely chunk long timer delays and use monotonic boundary checks so timer overflow or delayed callbacks cannot shorten or extend the configured deadline.
+- Cancel queued GitHub API retry backoffs when the shared deadline expires instead of allowing their timers to keep the action step running.
 
 ## 3.3.2
 

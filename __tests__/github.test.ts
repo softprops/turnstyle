@@ -36,6 +36,31 @@ const replaceOctokit = (client: OctokitGitHub, octokit: TestOctokit) => {
 const CLIENT_ERROR_STATUSES = Array.from({ length: 100 }, (_, index) => 400 + index);
 const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'];
 
+const advanceUntilCalled = async (mock: ReturnType<typeof vi.fn>) => {
+  for (let attempt = 0; attempt < 10 && mock.mock.calls.length === 0; attempt += 1) {
+    await vi.advanceTimersToNextTimerAsync();
+  }
+};
+
+const flushUntilTimerScheduled = async () => {
+  for (let attempt = 0; attempt < 50 && vi.getTimerCount() === 0; attempt += 1) {
+    await Promise.resolve();
+  }
+};
+
+const flushMicrotasks = async () => {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    await Promise.resolve();
+  }
+};
+
+const flushShortDelayWorkUntilCalled = async (mock: ReturnType<typeof vi.fn>) => {
+  for (let attempt = 0; attempt < 20 && mock.mock.calls.length === 0; attempt += 1) {
+    await vi.advanceTimersByTimeAsync(1);
+    await flushMicrotasks();
+  }
+};
+
 const clientWithRunPages = (...pagesByCall: WorkflowRunPages[]) => {
   const client = new OctokitGitHub('fake-token');
   let paginateCalls = 0;
@@ -112,6 +137,7 @@ const clientWithDynamicRunPages = (
 
 describe('github', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
     vi.clearAllMocks();
@@ -136,6 +162,74 @@ describe('github', () => {
         await expect(client.run('org', 'repo-' + status, status)).rejects.toMatchObject({ status });
         expect(fetchMock).toHaveBeenCalledTimes(1);
       }
+    });
+
+    it('cancels a pending 5xx retry backoff when its request signal is aborted', async () => {
+      vi.useFakeTimers();
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
+        options?.signal?.throwIfAborted();
+        return new Response(JSON.stringify({ message: 'server error' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      });
+      const controller = new AbortController();
+      const client = new OctokitGitHub('fake-token', 2);
+      const request = client.run('org', 'repo', 42, { signal: controller.signal });
+      const settled = vi.fn();
+      void request.then(settled, settled);
+
+      await advanceUntilCalled(fetchMock);
+      await flushUntilTimerScheduled();
+      await flushMicrotasks();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+      expect(settled).not.toHaveBeenCalled();
+
+      controller.abort();
+      await flushShortDelayWorkUntilCalled(settled);
+
+      expect(settled).toHaveBeenCalledOnce();
+      await request.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('cancels a pending primary-rate-limit backoff when its request signal is aborted', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+      const resetAtSeconds = Math.floor(Date.now() / 1000) + 600;
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
+        options?.signal?.throwIfAborted();
+        return new Response(JSON.stringify({ message: 'API rate limit exceeded' }), {
+          status: 403,
+          headers: {
+            'content-type': 'application/json',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': String(resetAtSeconds),
+          },
+        });
+      });
+      const controller = new AbortController();
+      const client = new OctokitGitHub('fake-token');
+      const request = client.run('org', 'repo', 42, { signal: controller.signal });
+      const settled = vi.fn();
+      void request.then(settled, settled);
+
+      await advanceUntilCalled(fetchMock);
+      await flushUntilTimerScheduled();
+      await flushMicrotasks();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+      expect(settled).not.toHaveBeenCalled();
+
+      controller.abort();
+      await flushShortDelayWorkUntilCalled(settled);
+
+      expect(settled).toHaveBeenCalledOnce();
+      await request.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(fetchMock).toHaveBeenCalledOnce();
     });
   });
 
@@ -529,6 +623,15 @@ describe('github', () => {
       ).toBeUndefined();
       expect(warning).toHaveBeenCalledWith('Request quota exhausted for request GET /rate-limited');
       expect(warning).not.toHaveBeenCalledWith('Retrying after 30 seconds!');
+    });
+
+    it('can defer primary retry scheduling to the abortable request hook', () => {
+      const throttleOptions = createThrottleOptions(false);
+
+      expect(
+        throttleOptions.onRateLimit(30, { method: 'GET', url: '/rate-limited' }, {}, 0),
+      ).toBeUndefined();
+      expect(warning).toHaveBeenCalledWith('Retrying after 30 seconds!');
     });
   });
 });

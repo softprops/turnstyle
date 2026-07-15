@@ -23,6 +23,7 @@
 - Create the shared `continue-after-seconds` or `abort-after-seconds` deadline in `main.ts` after parsing inputs and before the first Actions API read.
 - Treat the limit as a monotonic total-elapsed-time deadline across repository workflow lookup, workflow-run discovery, job and step reads, and sleeps.
 - Propagate the shared deadline signal through every potentially blocking Actions API read.
+- Keep GitHub API retry backoffs on the shared abortable, chunk-safe scheduler so a deadline does not leave an Octokit retry timer running.
 - Schedule long deadlines and sleeps in bounded timer chunks; never pass a delay above Node's timer maximum directly to `setTimeout`.
 - Use fake timers for deadline regression tests; do not add real sleeps.
 

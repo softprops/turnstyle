@@ -181,7 +181,11 @@ export class ActionDeadline {
     return outcome.value;
   };
 
-  private sleepUntilSeconds = async (sleepUntilSeconds: number): Promise<void> => {
+  private sleepUntilSeconds = async (
+    sleepUntilSeconds: number,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    signal?.throwIfAborted();
     this.throwIfReached();
 
     while (true) {
@@ -195,9 +199,16 @@ export class ActionDeadline {
       const chunk = new Promise<void>((resolve) => {
         sleepTimer = this.timing.setTimeout(resolve, delay);
       });
+      let rejectForAbort!: (reason: unknown) => void;
+      const aborted = new Promise<never>((_resolve, reject) => {
+        rejectForAbort = reject;
+      });
+      const onAbort = () => rejectForAbort(signal?.reason);
+      signal?.addEventListener('abort', onAbort, { once: true });
       try {
-        await this.race(() => chunk);
+        await this.race(() => (signal ? Promise.race([chunk, aborted]) : chunk));
       } finally {
+        signal?.removeEventListener('abort', onAbort);
         if (sleepTimer !== undefined) {
           this.timing.clearTimeout(sleepTimer);
         }
@@ -205,8 +216,8 @@ export class ActionDeadline {
     }
   };
 
-  sleepSeconds = async (seconds: number): Promise<void> =>
-    this.sleepUntilSeconds(this.timing.now() / 1000 + seconds);
+  sleepSeconds = async (seconds: number, signal?: AbortSignal): Promise<void> =>
+    this.sleepUntilSeconds(this.timing.now() / 1000 + seconds, signal);
 
   sleepUntilElapsedSeconds = async (seconds: number): Promise<void> =>
     this.sleepUntilSeconds(this.startedAtSeconds + seconds);
