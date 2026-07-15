@@ -24,6 +24,7 @@
 - Treat the limit as a monotonic total-elapsed-time deadline across repository workflow lookup, workflow-run discovery, job and step reads, and sleeps.
 - Propagate the shared deadline signal through every potentially blocking Actions API read.
 - Keep GitHub API retry backoffs on the shared abortable, chunk-safe scheduler so a deadline does not leave an Octokit retry timer running.
+- On an ordinary terminal failure, cancel the shared signal before reporting the original error; keep cancellation separate from deadline expiration and timer disposal.
 - Schedule long deadlines and sleeps in bounded timer chunks; never pass a delay above Node's timer maximum directly to `setTimeout`.
 - Use fake timers for deadline regression tests; do not add real sleeps.
 

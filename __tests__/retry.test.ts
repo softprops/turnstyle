@@ -8,6 +8,17 @@ const flushMicrotasks = async () => {
   }
 };
 
+const primaryRateLimitError = (resetAtSeconds?: string) =>
+  Object.assign(new Error('rate limited'), {
+    status: 403,
+    response: {
+      headers: {
+        'x-ratelimit-remaining': '0',
+        ...(resetAtSeconds === undefined ? {} : { 'x-ratelimit-reset': resetAtSeconds }),
+      },
+    },
+  });
+
 describe('abortable retry scheduling', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -102,5 +113,130 @@ describe('abortable retry scheduling', () => {
     await expect(result).resolves.toBe('ok');
     expect(operation).toHaveBeenNthCalledWith(2, 1);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('retries a primary limit independently after a server-error retry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const primaryError = primaryRateLimitError(String(Math.floor(Date.now() / 1000) + 5));
+    const operation = vi
+      .fn<(attempt: number) => Promise<string>>()
+      .mockRejectedValueOnce(Object.assign(new Error('server error'), { status: 500 }))
+      .mockRejectedValueOnce(primaryError)
+      .mockResolvedValue('ok');
+    const result = retryRequest(operation, 1);
+    void result.catch(() => undefined);
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(operation).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(operation).toHaveBeenNthCalledWith(2, 1);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(operation).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(result).resolves.toBe('ok');
+    expect(operation).toHaveBeenNthCalledWith(3, 2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('uses the first server-error delay after a primary-limit retry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const primaryError = primaryRateLimitError(String(Math.floor(Date.now() / 1000) + 5));
+    const operation = vi
+      .fn<(attempt: number) => Promise<string>>()
+      .mockRejectedValueOnce(primaryError)
+      .mockRejectedValueOnce(Object.assign(new Error('server error'), { status: 500 }))
+      .mockResolvedValue('ok');
+    const result = retryRequest(operation, 1);
+
+    await vi.advanceTimersByTimeAsync(5_999);
+    expect(operation).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(operation).toHaveBeenNthCalledWith(2, 1);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(operation).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(result).resolves.toBe('ok');
+    expect(operation).toHaveBeenNthCalledWith(3, 2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('keeps primary and server retry limits and delays independent in a longer sequence', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const primaryError = primaryRateLimitError(String(Math.floor(Date.now() / 1000) + 10));
+    const operation = vi
+      .fn<(attempt: number) => Promise<string>>()
+      .mockRejectedValueOnce(Object.assign(new Error('first server error'), { status: 500 }))
+      .mockRejectedValueOnce(primaryError)
+      .mockRejectedValueOnce(Object.assign(new Error('second server error'), { status: 502 }))
+      .mockRejectedValueOnce(Object.assign(new Error('third server error'), { status: 503 }))
+      .mockResolvedValue('ok');
+    const result = retryRequest(operation, 3);
+    void result.catch(() => undefined);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(operation).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(operation).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(operation).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(operation).toHaveBeenCalledTimes(4);
+    await vi.advanceTimersByTimeAsync(8_999);
+    expect(operation).toHaveBeenCalledTimes(4);
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(result).resolves.toBe('ok');
+    expect(operation).toHaveBeenCalledTimes(5);
+    expect(operation.mock.calls.map(([attempt]) => attempt)).toEqual([0, 1, 2, 3, 4]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('permits only one primary-limit retry and reports scheduling once', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const primaryError = primaryRateLimitError(String(Math.floor(Date.now() / 1000) - 1));
+    const operation = vi.fn().mockRejectedValue(primaryError);
+    const onPrimaryRateLimitRetry = vi.fn();
+
+    await expect(retryRequest(operation, 0, undefined, onPrimaryRateLimitRetry)).rejects.toBe(
+      primaryError,
+    );
+
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(onPrimaryRateLimitRetry).toHaveBeenCalledOnce();
+    expect(onPrimaryRateLimitRetry).toHaveBeenCalledWith(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([
+    ['a missing reset header', undefined],
+    ['an empty reset header', ''],
+    ['a malformed reset header', 'not-a-number'],
+  ])('does not schedule a primary retry for %s', async (_description, resetAtSeconds) => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const error = primaryRateLimitError(resetAtSeconds);
+    const operation = vi.fn().mockRejectedValue(error);
+    const onPrimaryRateLimitRetry = vi.fn();
+    const result = retryRequest(operation, 0, controller.signal, onPrimaryRateLimitRetry);
+    const settled = vi.fn();
+    void result.then(settled, (reason: unknown) => settled('rejected', reason));
+
+    try {
+      await flushMicrotasks();
+
+      expect(settled).toHaveBeenCalledWith('rejected', error);
+      expect(operation).toHaveBeenCalledOnce();
+      expect(onPrimaryRateLimitRetry).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      controller.abort();
+      await result.catch(() => undefined);
+    }
   });
 });

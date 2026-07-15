@@ -43,9 +43,9 @@ export class DeadlineReached extends Error {
  * Actions API reads and sleeps.
  */
 export class ActionDeadline {
-  readonly signal: AbortSignal | undefined;
+  readonly signal: AbortSignal;
 
-  private readonly controller: AbortController | undefined;
+  private readonly controller: AbortController;
   private readonly deadlineAtSeconds: number | undefined;
   private readonly reached: Promise<DeadlineOutcome>;
   private readonly resolveReached: (outcome: DeadlineOutcome) => void;
@@ -77,8 +77,8 @@ export class ActionDeadline {
     this.startedAtSeconds = timing.now() / 1000 - secondsSoFar;
     this.deadlineAtSeconds =
       config === undefined ? undefined : this.startedAtSeconds + config.seconds;
-    this.controller = config === undefined ? undefined : new AbortController();
-    this.signal = this.controller?.signal;
+    this.controller = new AbortController();
+    this.signal = this.controller.signal;
 
     let resolveReached!: (outcome: DeadlineOutcome) => void;
     this.reached = new Promise((resolve) => {
@@ -121,7 +121,7 @@ export class ActionDeadline {
 
     this.expired = true;
     this.resolveReached({ kind: 'deadline' });
-    this.controller?.abort();
+    this.controller.abort();
   };
 
   private scheduleDeadlineChunk = (): void => {
@@ -153,11 +153,12 @@ export class ActionDeadline {
     }
   };
 
-  race = async <T>(operation: (signal: AbortSignal | undefined) => Promise<T>): Promise<T> => {
+  race = async <T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> => {
     this.throwIfReached();
+    this.signal.throwIfAborted();
     const config = this.config;
     if (!config) {
-      return operation(undefined);
+      return operation(this.signal);
     }
 
     const operationOutcome = Promise.resolve()
@@ -203,7 +204,13 @@ export class ActionDeadline {
       const aborted = new Promise<never>((_resolve, reject) => {
         rejectForAbort = reject;
       });
-      const onAbort = () => rejectForAbort(signal?.reason);
+      const onAbort = () => {
+        if (sleepTimer !== undefined) {
+          this.timing.clearTimeout(sleepTimer);
+          sleepTimer = undefined;
+        }
+        rejectForAbort(signal?.reason);
+      };
       signal?.addEventListener('abort', onAbort, { once: true });
       try {
         await this.race(() => (signal ? Promise.race([chunk, aborted]) : chunk));
@@ -221,6 +228,10 @@ export class ActionDeadline {
 
   sleepUntilElapsedSeconds = async (seconds: number): Promise<void> =>
     this.sleepUntilSeconds(this.startedAtSeconds + seconds);
+
+  cancel = (reason?: unknown): void => {
+    this.controller.abort(reason);
+  };
 
   dispose = (): void => {
     if (this.timer !== undefined) {

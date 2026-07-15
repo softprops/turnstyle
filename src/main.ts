@@ -50,9 +50,7 @@ export async function run(
     const github = githubFactory(input.githubToken, input.retries);
     debug(`Fetching workflows for ${input.owner}/${input.repo}...`);
     const workflows = await deadline.race((signal) =>
-      signal
-        ? github.workflows(input.owner, input.repo, { signal })
-        : github.workflows(input.owner, input.repo),
+      github.workflows(input.owner, input.repo, { signal }),
     );
     debug(`Found ${workflows.length} workflows in ${input.owner}/${input.repo}`);
     deadline.throwIfReached();
@@ -79,6 +77,7 @@ export async function run(
         setFailed(errorMessage(deadlineError));
       }
     } else {
+      deadline?.cancel(error);
       setFailed(errorMessage(error));
     }
   } finally {

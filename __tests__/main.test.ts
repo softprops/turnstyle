@@ -8,6 +8,7 @@ import {
   type GitHubClientFactory,
   type WaiterFactory,
 } from '../src/main';
+import { retryRequest } from '../src/retry';
 
 vi.mock('@actions/core', () => ({
   debug: vi.fn(),
@@ -57,7 +58,9 @@ describe('main', () => {
     await run(environment(), githubFactory, waiterFactory);
 
     expect(githubFactory).toHaveBeenCalledWith('secret', 2);
-    expect(workflows).toHaveBeenCalledWith('softprops', 'turnstyle');
+    expect(workflows).toHaveBeenCalledWith('softprops', 'turnstyle', {
+      signal: expect.any(AbortSignal),
+    });
     expect(waiterFactory).toHaveBeenCalledWith(
       123,
       github,
@@ -274,5 +277,61 @@ describe('main', () => {
     await run(environment(), () => github, waiterFactory);
 
     expect(setFailed).toHaveBeenCalledWith(expectedMessage);
+  });
+
+  it('cancels concurrent discovery work before reporting the original API failure', async () => {
+    vi.useFakeTimers();
+    const originalError = Object.assign(new Error('Bad credentials'), { status: 401 });
+    const serverOperation = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('server error'), { status: 500 }));
+    const pendingAborted = vi.fn();
+    let sharedSignal: AbortSignal | undefined;
+    const runs = vi.fn(
+      async (
+        _owner: string,
+        _repo: string,
+        _workflowId: number,
+        _filters?: unknown,
+        requestOptions?: { signal?: AbortSignal },
+      ) => {
+        sharedSignal = requestOptions?.signal;
+        if (!sharedSignal) {
+          throw new Error('missing shared signal');
+        }
+
+        const retryingStatus = retryRequest(serverOperation, 1, sharedSignal);
+        const pendingStatus = new Promise<never>((_resolve, reject) => {
+          sharedSignal?.addEventListener(
+            'abort',
+            () => {
+              pendingAborted();
+              reject(sharedSignal?.reason);
+            },
+            { once: true },
+          );
+        });
+        await Promise.all([retryingStatus, pendingStatus, Promise.reject(originalError)]);
+        return [];
+      },
+    );
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    await run(environment({ 'INPUT_ABORT-AFTER-SECONDS': '10', INPUT_RETRIES: '1' }), () =>
+      actionClient({
+        workflows: async () => [{ id: 123, name: 'CI' }],
+        runs,
+      }),
+    );
+
+    expect(setFailed).toHaveBeenCalledWith('Bad credentials');
+    expect(sharedSignal?.aborted).toBe(true);
+    expect(pendingAborted).toHaveBeenCalledOnce();
+    expect(serverOperation).toHaveBeenCalledOnce();
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1_000);
+    expect(vi.getTimerCount()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(serverOperation).toHaveBeenCalledOnce();
   });
 });

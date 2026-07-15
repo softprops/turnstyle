@@ -20,7 +20,16 @@ const primaryRateLimitDelaySeconds = (error: unknown): number | undefined => {
     return undefined;
   }
 
-  const resetAtSeconds = Number(response.headers['x-ratelimit-reset']);
+  const resetHeader = response.headers['x-ratelimit-reset'];
+  if (!resetHeader?.trim()) {
+    return undefined;
+  }
+
+  const resetAtSeconds = Number(resetHeader);
+  if (!Number.isFinite(resetAtSeconds)) {
+    return undefined;
+  }
+
   return Math.max(Math.ceil(resetAtSeconds - Date.now() / 1000) + 1, 0);
 };
 
@@ -38,16 +47,18 @@ const waitForRetry = async (seconds: number, signal: AbortSignal | undefined) =>
  * Bottleneck retry timers alive after the action lifecycle signal aborts.
  */
 export const retryRequest = async <T>(
-  operation: (retryCount: number) => Promise<T>,
+  operation: (requestAttemptCount: number) => Promise<T>,
   serverErrorRetries: number,
   signal?: AbortSignal,
+  onPrimaryRateLimitRetry?: (delaySeconds: number) => void,
 ): Promise<T> => {
-  let retryCount = 0;
+  let requestAttemptCount = 0;
   let serverErrorRetryCount = 0;
+  let primaryRateLimitRetryCount = 0;
   while (true) {
     signal?.throwIfAborted();
     try {
-      return await operation(retryCount);
+      return await operation(requestAttemptCount);
     } catch (error: unknown) {
       signal?.throwIfAborted();
       const status = errorStatus(error);
@@ -56,16 +67,18 @@ export const retryRequest = async <T>(
 
       if (status !== undefined && status >= 500 && serverErrorRetryCount < serverErrorRetries) {
         serverErrorRetryCount += 1;
-        retryDelay = (retryCount + 1) ** 2;
-      } else if (primaryRateLimitDelay !== undefined && retryCount < 1) {
+        retryDelay = serverErrorRetryCount ** 2;
+      } else if (primaryRateLimitDelay !== undefined && primaryRateLimitRetryCount < 1) {
+        primaryRateLimitRetryCount += 1;
         retryDelay = primaryRateLimitDelay;
+        onPrimaryRateLimitRetry?.(retryDelay);
       }
 
       if (retryDelay === undefined) {
         throw error;
       }
 
-      retryCount += 1;
+      requestAttemptCount += 1;
       await waitForRetry(retryDelay, signal);
     }
   }

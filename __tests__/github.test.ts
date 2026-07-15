@@ -42,6 +42,12 @@ const advanceUntilCalled = async (mock: ReturnType<typeof vi.fn>) => {
   }
 };
 
+const advanceUntilCallCount = async (mock: ReturnType<typeof vi.fn>, count: number) => {
+  for (let attempt = 0; attempt < 20 && mock.mock.calls.length < count; attempt += 1) {
+    await vi.advanceTimersToNextTimerAsync();
+  }
+};
+
 const flushUntilTimerScheduled = async () => {
   for (let attempt = 0; attempt < 50 && vi.getTimerCount() === 0; attempt += 1) {
     await Promise.resolve();
@@ -230,6 +236,42 @@ describe('github', () => {
       await request.catch(() => undefined);
       await vi.advanceTimersByTimeAsync(600_000);
       expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('logs only the one primary-rate-limit retry that is actually scheduled', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+      const resetAtSeconds = Math.floor(Date.now() / 1000) - 1;
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ message: 'API rate limit exceeded' }), {
+          status: 403,
+          headers: {
+            'content-type': 'application/json',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': String(resetAtSeconds),
+          },
+        }),
+      );
+      const request = new OctokitGitHub('fake-token').run('org', 'repo', 42);
+      const rejection = expect(request).rejects.toMatchObject({ status: 403 });
+      const settled = vi.fn();
+      void request.then(settled, settled);
+
+      await advanceUntilCalled(fetchMock);
+      await advanceUntilCallCount(fetchMock, 2);
+      await flushShortDelayWorkUntilCalled(settled);
+      await rejection;
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const messages = vi
+        .mocked(warning)
+        .mock.calls.map(([message]) => (typeof message === 'string' ? message : message.message));
+      expect(
+        messages.filter((message) => message.startsWith('Request quota exhausted for request')),
+      ).toHaveLength(2);
+      expect(messages.filter((message) => message.startsWith('Retrying after'))).toEqual([
+        'Retrying after 0 seconds!',
+      ]);
     });
   });
 
@@ -631,7 +673,8 @@ describe('github', () => {
       expect(
         throttleOptions.onRateLimit(30, { method: 'GET', url: '/rate-limited' }, {}, 0),
       ).toBeUndefined();
-      expect(warning).toHaveBeenCalledWith('Retrying after 30 seconds!');
+      expect(warning).toHaveBeenCalledWith('Request quota exhausted for request GET /rate-limited');
+      expect(warning).not.toHaveBeenCalledWith('Retrying after 30 seconds!');
     });
   });
 });

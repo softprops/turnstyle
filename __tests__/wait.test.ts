@@ -1285,12 +1285,19 @@ describe('wait', () => {
 
           await waiter.wait();
 
-          expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', workflow1.id, {
-            branch: undefined,
-          });
-          expect(activeRunsForRepo).toHaveBeenCalledWith('org', 'repo', {
-            branch: undefined,
-          });
+          expect(mockedRunsFunc).toHaveBeenCalledWith(
+            'org',
+            'repo',
+            workflow1.id,
+            { branch: undefined },
+            { signal: expect.any(AbortSignal) },
+          );
+          expect(activeRunsForRepo).toHaveBeenCalledWith(
+            'org',
+            'repo',
+            { branch: undefined },
+            { signal: expect.any(AbortSignal) },
+          );
 
           const hasSearchMessage = debugMessages.some((msg) =>
             msg.includes('Searching active workflow runs across repository'),
@@ -1457,9 +1464,13 @@ describe('wait', () => {
           expect(hasSearchMessage).toBe(false);
           const hasQueueMessage = debugMessages.some((msg) => msg.includes('matches queue'));
           expect(hasQueueMessage).toBe(false);
-          expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', workflow1.id, {
-            branch: undefined,
-          });
+          expect(mockedRunsFunc).toHaveBeenCalledWith(
+            'org',
+            'repo',
+            workflow1.id,
+            { branch: undefined },
+            { signal: expect.any(AbortSignal) },
+          );
         });
 
         it('keeps queue-name discovery bounded on repositories with many workflows', async () => {

@@ -185,4 +185,34 @@ describe('ActionDeadline', () => {
     );
     expect(deadline.signal?.aborted).toBe(true);
   });
+
+  it('cancels pending work idempotently without marking the configured deadline as reached', () => {
+    const fake = manualTiming();
+    const deadline = new ActionDeadline({ mode: 'abort', seconds: 10 }, fake.timing);
+    const reason = new Error('terminal API failure');
+
+    deadline.cancel(reason);
+    deadline.cancel(new Error('later cancellation'));
+
+    expect(deadline.signal?.aborted).toBe(true);
+    expect(deadline.signal?.reason).toBe(reason);
+    expect(() => deadline.throwIfReached()).not.toThrow();
+    expect(fake.timerCount()).toBe(1);
+
+    deadline.dispose();
+    expect(fake.timerCount()).toBe(0);
+  });
+
+  it('preserves the configured deadline outcome when cancellation follows expiration', async () => {
+    const fake = manualTiming();
+    const deadline = new ActionDeadline({ mode: 'continue', seconds: 1 }, fake.timing);
+
+    fake.advanceTo(1_000);
+    fake.deliverNextTimer();
+    deadline.cancel(new Error('terminal API failure'));
+
+    await expect(deadline.race(async () => 'too late')).rejects.toEqual(
+      new DeadlineReached('continue', 1),
+    );
+  });
 });

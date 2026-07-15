@@ -20,10 +20,10 @@ export const createThrottleOptions = (retryThroughPlugin: boolean = true) => ({
   ): true | undefined => {
     warning(`Request quota exhausted for request ${options.method} ${options.url}`);
 
-    if (retryCount < 1) {
+    if (retryCount < 1 && retryThroughPlugin) {
       // only retries once
       warning(`Retrying after ${retryAfter} seconds!`);
-      return retryThroughPlugin ? true : undefined;
+      return true;
     }
 
     return undefined;
@@ -102,6 +102,7 @@ export class OctokitGitHub {
           ),
         retries,
         options.request.signal,
+        (delaySeconds) => warning(`Retrying after ${delaySeconds} seconds!`),
       );
     });
   }

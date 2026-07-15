@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkflowJob, WorkflowRun, WorkflowStep } from '../../src/github';
 import type { Input } from '../../src/input';
+import { retryRequest } from '../../src/retry';
 import { Waiter, type WaiterGitHubClient } from '../../src/wait';
 
 vi.mock('@actions/core', () => ({
@@ -296,8 +297,58 @@ describe('wait deadlines', () => {
 
     await expect(waitPromise).rejects.toThrow('API unavailable');
 
-    expect(runs.mock.calls[0][4].signal.aborted).toBe(false);
+    expect(runs.mock.calls[0][4].signal.aborted).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cancels concurrent discovery work before propagating an owned-deadline failure', async () => {
+    const originalError = Object.assign(new Error('Bad credentials'), { status: 401 });
+    const serverOperation = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('server error'), { status: 500 }));
+    const pendingAborted = vi.fn();
+    let sharedSignal: AbortSignal | undefined;
+    const runs = vi.fn(
+      async (
+        _owner: string,
+        _repo: string,
+        _workflowId: number,
+        _filters?: unknown,
+        requestOptions?: { signal?: AbortSignal },
+      ) => {
+        sharedSignal = requestOptions?.signal;
+        if (!sharedSignal) {
+          throw new Error('missing shared signal');
+        }
+
+        const retryingStatus = retryRequest(serverOperation, 1, sharedSignal);
+        const pendingStatus = new Promise<never>((_resolve, reject) => {
+          sharedSignal?.addEventListener(
+            'abort',
+            () => {
+              pendingAborted();
+              reject(sharedSignal?.reason);
+            },
+            { once: true },
+          );
+        });
+        await Promise.all([retryingStatus, pendingStatus, Promise.reject(originalError)]);
+        return [];
+      },
+    );
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const waitPromise = waiter(input({ abortAfterSeconds: 10 }), client({ runs })).wait();
+
+    await expect(waitPromise).rejects.toBe(originalError);
+
+    expect(sharedSignal?.aborted).toBe(true);
+    expect(pendingAborted).toHaveBeenCalledOnce();
+    expect(serverOperation).toHaveBeenCalledOnce();
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1_000);
+    expect(vi.getTimerCount()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(serverOperation).toHaveBeenCalledOnce();
   });
 
   it('reuses one deadline signal and leaves no timers after repeated polling', async () => {
