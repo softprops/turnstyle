@@ -1,0 +1,27 @@
+__tests__/github.test.ts
+  s_87941aaa79a704::t_421a65cac8aa5e 276-330
+__tests__/retry.test.ts
+  s_87941aaa79a704::t_8e398b33e17905 55,227,236-237
+  s_87941aaa79a704::t_421a65cac8aa5e 217-226,228-235,238-258,263-267
+  s_87941aaa79a704::t_a05f76cc1147ab 268
+src/retry.ts
+  s_87941aaa79a704::t_8b7d6ccbd1395b 12-21,23-26,42-48
+dist/index.js
+  s_87941aaa79a704::t_2cdb2791a85473 1-3,5,14,40-41,45-46,58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "1250683968a16c204c6ee3a75a3e10a4e42ef425",
+  "prompts": {},
+  "sessions": {
+    "s_87941aaa79a704": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6569-1f13-7b83-a72a-d4c5039245fc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
