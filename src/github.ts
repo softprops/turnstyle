@@ -2,7 +2,12 @@ import { warning } from '@actions/core';
 import { retry } from '@octokit/plugin-retry';
 import { throttling } from '@octokit/plugin-throttling';
 import { Octokit } from '@octokit/rest';
-import type { EndpointDefaults, Endpoints, RequestParameters } from '@octokit/types';
+import type {
+  EndpointDefaults,
+  Endpoints,
+  RequestInterface,
+  RequestParameters,
+} from '@octokit/types';
 import { retryRequest } from './retry';
 
 const ThrottledOctokit = Octokit.plugin(throttling, retry);
@@ -48,6 +53,17 @@ export interface WorkflowRunFilters {
 export interface GitHubRequestOptions {
   signal?: AbortSignal;
 }
+
+const bindRequestSignal = <T extends RequestInterface>(
+  request: T,
+  signal: AbortSignal | undefined,
+): T =>
+  // The pagination plugin reconstructs each page request from method, URL,
+  // and headers. Binding the signal into the method defaults keeps it present
+  // when those reduced page options pass through the request and retry hooks.
+  // `.defaults()` preserves the endpoint's request and response contract, but
+  // its public return type does not retain the endpoint method's subtype.
+  (signal ? request.defaults({ request: { signal } }) : request) as T;
 
 const matchesWorkflowRunFilters = (run: WorkflowRun, filters: WorkflowRunFilters) => {
   if (!ACTIVE_RUN_STATUS_SET.has(run.status || '')) {
@@ -108,12 +124,14 @@ export class OctokitGitHub {
   }
 
   workflows = async (owner: string, repo: string, requestOptions: GitHubRequestOptions = {}) =>
-    this.octokit.paginate(this.octokit.actions.listRepoWorkflows, {
-      owner,
-      repo,
-      per_page: 100,
-      ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
-    });
+    this.octokit.paginate(
+      bindRequestSignal(this.octokit.actions.listRepoWorkflows, requestOptions.signal),
+      {
+        owner,
+        repo,
+        per_page: 100,
+      },
+    );
 
   run = async (
     owner: string,
@@ -152,12 +170,11 @@ export class OctokitGitHub {
       ACTIVE_RUN_STATUSES.map(async (status) => {
         let pagesScanned = 0;
         const runs = await paginateWorkflowRuns(
-          listRuns,
+          bindRequestSignal(listRuns, requestOptions.signal),
           {
             ...baseOptions,
             ...(filters.branch ? { branch: filters.branch } : {}),
             status,
-            ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
           },
           (response: { data: WorkflowRun[] }, done: () => void) => {
             pagesScanned += 1;
@@ -237,10 +254,12 @@ export class OctokitGitHub {
         repo,
         run_id,
         per_page: 100,
-        ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
       };
 
-    return this.octokit.paginate(this.octokit.actions.listJobsForWorkflowRun, options);
+    return this.octokit.paginate(
+      bindRequestSignal(this.octokit.actions.listJobsForWorkflowRun, requestOptions.signal),
+      options,
+    );
   };
 
   steps = async (
