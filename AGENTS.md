@@ -20,8 +20,10 @@
 
 ## Wait Deadlines
 
-- Treat `continue-after-seconds` and `abort-after-seconds` as monotonic total-elapsed-time deadlines across API reads and sleeps.
-- Propagate the shared deadline signal through every potentially blocking workflow-run, job, and step read.
+- Create the shared `continue-after-seconds` or `abort-after-seconds` deadline in `main.ts` after parsing inputs and before the first Actions API read.
+- Treat the limit as a monotonic total-elapsed-time deadline across repository workflow lookup, workflow-run discovery, job and step reads, and sleeps.
+- Propagate the shared deadline signal through every potentially blocking Actions API read.
+- Schedule long deadlines and sleeps in bounded timer chunks; never pass a delay above Node's timer maximum directly to `setTimeout`.
 - Use fake timers for deadline regression tests; do not add real sleeps.
 
 ## Docs

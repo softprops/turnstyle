@@ -139,9 +139,12 @@ describe('github', () => {
   });
 
   describe('API wrappers', () => {
-    it('paginates workflows with repository coordinates', async () => {
+    it('paginates workflows with repository coordinates and forwards an abort signal', async () => {
       const listRepoWorkflows = vi.fn();
-      const paginate = vi.fn().mockResolvedValue([{ id: 123, name: 'CI' }]);
+      const paginate = vi
+        .fn()
+        .mockResolvedValueOnce([{ id: 123, name: 'CI' }])
+        .mockResolvedValueOnce([{ id: 456, name: 'Deploy' }]);
       const client = new OctokitGitHub('fake-token');
       replaceOctokit(client, {
         actions: { listRepoWorkflows },
@@ -149,10 +152,20 @@ describe('github', () => {
       });
 
       await expect(client.workflows('org', 'repo')).resolves.toEqual([{ id: 123, name: 'CI' }]);
-      expect(paginate).toHaveBeenCalledWith(listRepoWorkflows, {
+      const signal = new AbortController().signal;
+      await expect(client.workflows('org', 'repo', { signal })).resolves.toEqual([
+        { id: 456, name: 'Deploy' },
+      ]);
+      expect(paginate).toHaveBeenNthCalledWith(1, listRepoWorkflows, {
         owner: 'org',
         repo: 'repo',
         per_page: 100,
+      });
+      expect(paginate).toHaveBeenNthCalledWith(2, listRepoWorkflows, {
+        owner: 'org',
+        repo: 'repo',
+        per_page: 100,
+        request: { signal },
       });
     });
 

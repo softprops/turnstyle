@@ -1,4 +1,11 @@
 import { setOutput } from '@actions/core';
+import {
+  ActionDeadline,
+  DeadlineReached,
+  handleDeadline,
+  systemDeadlineTiming,
+  type DeadlineTiming,
+} from './deadline';
 import type {
   GitHubRequestOptions,
   WorkflowJob,
@@ -139,49 +146,16 @@ export interface Wait {
   wait(secondsSoFar?: number): Promise<number | undefined>;
 }
 
-export interface WaiterTiming {
-  now(): number;
-  setTimeout(callback: () => void, milliseconds: number): ReturnType<typeof setTimeout>;
-  clearTimeout(timeout: ReturnType<typeof setTimeout>): void;
-}
-
-const systemTiming: WaiterTiming = {
-  now: () => performance.now(),
-  setTimeout: (callback, milliseconds) => setTimeout(callback, milliseconds),
-  clearTimeout: (timeout) => clearTimeout(timeout),
-};
-
-type DeadlineMode = 'continue' | 'abort';
-
-interface DeadlineState {
-  mode: DeadlineMode;
-  seconds: number;
-  controller: AbortController;
-  expired: boolean;
-  reached: Promise<{ kind: 'deadline' }>;
-  resolveReached: (result: { kind: 'deadline' }) => void;
-  timer: ReturnType<typeof setTimeout> | undefined;
-}
-
-class WaitDeadlineReached extends Error {
-  constructor(
-    readonly mode: DeadlineMode,
-    readonly seconds: number,
-  ) {
-    super(`Wait ${mode} deadline reached`);
-  }
-}
-
 export class Waiter implements Wait {
   private readonly info: (msg: string) => void;
   private readonly debug: (msg: string) => void;
   private readonly input: Input;
   private readonly githubClient: WaiterGitHubClient;
   private readonly workflowId: number;
-  private readonly timing: WaiterTiming;
+  private readonly timing: DeadlineTiming;
+  private readonly sharedDeadline: ActionDeadline | undefined;
   private previousRunOutput: WorkflowRun | undefined;
-  private waitStartedAtMilliseconds = 0;
-  private deadline: DeadlineState | undefined;
+  private deadline: ActionDeadline | undefined;
 
   constructor(
     workflowId: number,
@@ -189,7 +163,8 @@ export class Waiter implements Wait {
     input: Input,
     info: (msg: string) => void,
     debug: (msg: string) => void,
-    timing: WaiterTiming = systemTiming,
+    timing: DeadlineTiming = systemDeadlineTiming,
+    deadline?: ActionDeadline,
   ) {
     this.workflowId = workflowId;
     this.input = input;
@@ -197,6 +172,7 @@ export class Waiter implements Wait {
     this.info = info;
     this.debug = debug;
     this.timing = timing;
+    this.sharedDeadline = deadline;
   }
 
   private setPreviousRunOutput = (run: WorkflowRun) => {
@@ -214,128 +190,15 @@ export class Waiter implements Wait {
     }
   };
 
-  private abortError = (deadlineSeconds: number): Error => {
-    this.info(`🛑Exceeded wait seconds. Aborting...`);
-    setOutput('force_continued', '');
-    this.clearPreviousRunOutput();
-    return new Error(`Aborted after waiting ${deadlineSeconds} seconds`);
-  };
-
-  private handleDeadline = (deadline: WaitDeadlineReached): number => {
-    if (deadline.mode === 'continue') {
-      this.info(`🤙Exceeded wait seconds. Continuing...`);
-      setOutput('force_continued', '1');
-      this.clearPreviousRunOutput();
-      return deadline.seconds;
-    }
-
-    throw this.abortError(deadline.seconds);
-  };
-
-  private startDeadline = (secondsSoFar: number): DeadlineState | undefined => {
-    const deadlineConfig: { mode: DeadlineMode; seconds: number } | undefined =
-      this.input.continueAfterSeconds !== undefined
-        ? { mode: 'continue', seconds: this.input.continueAfterSeconds }
-        : this.input.abortAfterSeconds !== undefined
-          ? { mode: 'abort', seconds: this.input.abortAfterSeconds }
-          : undefined;
-    if (!deadlineConfig) {
-      return undefined;
-    }
-    const { mode, seconds } = deadlineConfig;
-
-    const controller = new AbortController();
-    let resolveReached!: (result: { kind: 'deadline' }) => void;
-    const reached = new Promise<{ kind: 'deadline' }>((resolve) => {
-      resolveReached = resolve;
-    });
-    const deadline: DeadlineState = {
-      mode,
-      seconds,
-      controller,
-      expired: false,
-      reached,
-      resolveReached,
-      timer: undefined,
-    };
-    const expire = () => {
-      deadline.expired = true;
-      deadline.resolveReached({ kind: 'deadline' });
-      deadline.controller.abort();
-    };
-    const remainingMilliseconds = Math.max(0, (seconds - secondsSoFar) * 1000);
-
-    if (remainingMilliseconds === 0) {
-      expire();
-    } else {
-      deadline.timer = this.timing.setTimeout(expire, remainingMilliseconds);
-    }
-
-    return deadline;
-  };
-
-  private clearDeadline = (deadline: DeadlineState | undefined) => {
-    if (deadline?.timer !== undefined) {
-      this.timing.clearTimeout(deadline.timer);
-    }
-  };
-
-  private deadlineError = (deadline: DeadlineState): WaitDeadlineReached =>
-    new WaitDeadlineReached(deadline.mode, deadline.seconds);
-
-  private raceWithDeadline = async <T>(operation: Promise<T>): Promise<T> => {
-    const deadline = this.deadline;
-    if (!deadline) {
-      return operation;
-    }
-
-    try {
-      const result = await Promise.race([
-        operation.then((value) => ({ kind: 'value' as const, value })),
-        deadline.reached,
-      ]);
-      if (result.kind === 'deadline') {
-        throw this.deadlineError(deadline);
-      }
-      return result.value;
-    } catch (error: unknown) {
-      if (deadline.expired) {
-        throw this.deadlineError(deadline);
-      }
-      throw error;
-    }
-  };
-
   private withDeadline = async <T>(
     operation: (signal: AbortSignal | undefined) => Promise<T>,
   ): Promise<T> => {
     const deadline = this.deadline;
     if (!deadline) {
-      return operation(undefined);
+      throw new Error('Wait deadline has not been initialized');
     }
 
-    return this.raceWithDeadline(operation(deadline.controller.signal));
-  };
-
-  private elapsedMilliseconds = (): number =>
-    Math.max(0, this.timing.now() - this.waitStartedAtMilliseconds);
-
-  private sleep = async (milliseconds: number): Promise<void> => {
-    if (milliseconds <= 0) {
-      return;
-    }
-
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const sleepPromise = new Promise<void>((resolve) => {
-      timer = this.timing.setTimeout(resolve, milliseconds);
-    });
-    try {
-      await this.raceWithDeadline(sleepPromise);
-    } finally {
-      if (timer !== undefined) {
-        this.timing.clearTimeout(timer);
-      }
-    }
+    return deadline.race(operation);
   };
 
   private discoverRuns = async (): Promise<{
@@ -454,13 +317,15 @@ export class Waiter implements Wait {
       if (previousRuns.length === 0) {
         setOutput('force_continued', '');
         this.clearPreviousRunOutput();
-        const initialWaitRemainingMilliseconds =
-          this.input.initialWaitSeconds * 1000 - this.elapsedMilliseconds();
-        if (initialWaitRemainingMilliseconds > 0) {
+        const deadline = this.deadline;
+        if (!deadline) {
+          throw new Error('Wait deadline has not been initialized');
+        }
+        if (!deadline.hasElapsedSeconds(this.input.initialWaitSeconds)) {
           this.info(
-            `🔎 Waiting for ${this.input.initialWaitSeconds} seconds before checking for runs again...`,
+            `🔎 Waiting until the ${this.input.initialWaitSeconds}-second initial discovery window expires before checking again...`,
           );
-          await this.sleep(initialWaitRemainingMilliseconds);
+          await deadline.sleepUntilElapsedSeconds(this.input.initialWaitSeconds);
           continue;
         }
         return;
@@ -541,28 +406,34 @@ export class Waiter implements Wait {
   };
 
   wait = async (secondsSoFar: number = 0): Promise<number | undefined> => {
-    this.waitStartedAtMilliseconds = this.timing.now() - secondsSoFar * 1000;
-    const deadline = this.startDeadline(secondsSoFar);
+    const deadline =
+      this.sharedDeadline || ActionDeadline.fromInput(this.input, this.timing, secondsSoFar);
+    const ownsDeadline = !this.sharedDeadline;
     this.deadline = deadline;
 
     try {
-      if (deadline?.expired) {
-        throw this.deadlineError(deadline);
-      }
+      deadline.throwIfReached();
       await this.waitForCompletion();
+      deadline.throwIfReached();
       return undefined;
     } catch (error: unknown) {
-      if (error instanceof WaitDeadlineReached) {
-        return this.handleDeadline(error);
+      if (error instanceof DeadlineReached) {
+        return handleDeadline(error, this.info, this.clearPreviousRunOutput);
       }
       throw error;
     } finally {
-      this.clearDeadline(deadline);
+      if (ownsDeadline) {
+        deadline.dispose();
+      }
       this.deadline = undefined;
     }
   };
 
   pollAndWait = async (): Promise<void> => {
-    await this.sleep(this.input.pollIntervalSeconds * 1000);
+    const deadline = this.deadline;
+    if (!deadline) {
+      throw new Error('Wait deadline has not been initialized');
+    }
+    await deadline.sleepSeconds(this.input.pollIntervalSeconds);
   };
 }

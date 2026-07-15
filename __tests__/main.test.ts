@@ -1,6 +1,7 @@
-import { debug, setFailed } from '@actions/core';
+import { debug, setFailed, setOutput } from '@actions/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { ActionDeadline } from '../src/deadline';
 import {
   run,
   type ActionGitHubClient,
@@ -41,6 +42,7 @@ const actionClient = (overrides: Partial<ActionGitHubClient> = {}): ActionGitHub
 
 describe('main', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.clearAllMocks();
   });
@@ -66,6 +68,7 @@ describe('main', () => {
         runId: 42,
         retries: 2,
       }),
+      expect.any(ActionDeadline),
     );
     expect(wait).toHaveBeenCalledOnce();
     expect(setFailed).not.toHaveBeenCalled();
@@ -91,7 +94,12 @@ describe('main', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(setFailed).not.toHaveBeenCalled();
-    expect(waiterFactory).toHaveBeenCalledWith(123, expect.any(Object), expect.any(Object));
+    expect(waiterFactory).toHaveBeenCalledWith(
+      123,
+      expect.any(Object),
+      expect.any(Object),
+      expect.any(ActionDeadline),
+    );
     expect(wait).toHaveBeenCalledOnce();
   });
 
@@ -146,6 +154,112 @@ describe('main', () => {
     await run(environment(), () => github, vi.fn());
 
     expect(setFailed).toHaveBeenCalledWith('API unavailable');
+  });
+
+  it.each([
+    ['abort', 'INPUT_ABORT-AFTER-SECONDS', 'Aborted after waiting 1 seconds'],
+    ['continue', 'INPUT_CONTINUE-AFTER-SECONDS', undefined],
+  ] as const)(
+    'bounds a pending workflow lookup in %s mode from the start of the action',
+    async (mode, inputName, expectedFailure) => {
+      vi.useFakeTimers();
+      let workflowSignal: AbortSignal | undefined;
+      const workflows = vi.fn(
+        async (_owner: string, _repo: string, options?: { signal?: AbortSignal }) => {
+          workflowSignal = options?.signal;
+          return new Promise<never>(() => undefined);
+        },
+      );
+      const waiterFactory: WaiterFactory = vi.fn();
+      const result = run(
+        environment({ [inputName]: '1' }),
+        () => actionClient({ workflows }),
+        waiterFactory,
+      );
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(setFailed).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await result;
+
+      expect(workflows).toHaveBeenCalledOnce();
+      expect(workflowSignal).toBeDefined();
+      expect(workflowSignal?.aborted).toBe(true);
+      expect(waiterFactory).not.toHaveBeenCalled();
+      expect(setOutput).toHaveBeenCalledWith('force_continued', mode === 'continue' ? '1' : '');
+      expect(setOutput).toHaveBeenCalledWith('previous_run_id', '');
+      expect(setOutput).toHaveBeenCalledWith('previous_run_url', '');
+      if (expectedFailure) {
+        expect(setFailed).toHaveBeenCalledWith(expectedFailure);
+      } else {
+        expect(setFailed).not.toHaveBeenCalled();
+      }
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it.each([
+    ['abort', 'INPUT_ABORT-AFTER-SECONDS', 'Aborted after waiting 0 seconds'],
+    ['continue', 'INPUT_CONTINUE-AFTER-SECONDS', undefined],
+  ] as const)(
+    'does not start workflow lookup for an already-expired zero-second %s deadline',
+    async (mode, inputName, expectedFailure) => {
+      vi.useFakeTimers();
+      const githubFactory: GitHubClientFactory = vi.fn();
+      const waiterFactory: WaiterFactory = vi.fn();
+
+      await run(environment({ [inputName]: '0' }), githubFactory, waiterFactory);
+
+      expect(githubFactory).not.toHaveBeenCalled();
+      expect(waiterFactory).not.toHaveBeenCalled();
+      expect(setOutput).toHaveBeenCalledWith('force_continued', mode === 'continue' ? '1' : '');
+      expect(setOutput).toHaveBeenCalledWith('previous_run_id', '');
+      expect(setOutput).toHaveBeenCalledWith('previous_run_url', '');
+      if (expectedFailure) {
+        expect(setFailed).toHaveBeenCalledWith(expectedFailure);
+      } else {
+        expect(setFailed).not.toHaveBeenCalled();
+      }
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it('shares workflow lookup elapsed time with the waiter deadline', async () => {
+    vi.useFakeTimers();
+    const workflows = vi.fn(
+      async (_owner: string, _repo: string, options?: { signal?: AbortSignal }) => {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        options?.signal?.throwIfAborted();
+        return [{ id: 123, name: 'CI' }];
+      },
+    );
+    const waiterStarted = vi.fn();
+    const waiterFactory: WaiterFactory = vi.fn((_workflowId, _github, _input, deadline) => ({
+      wait: async () => {
+        waiterStarted();
+        await deadline.race(() => new Promise<never>(() => undefined));
+        return undefined;
+      },
+    }));
+    const result = run(
+      environment({ 'INPUT_CONTINUE-AFTER-SECONDS': '1' }),
+      () => actionClient({ workflows }),
+      waiterFactory,
+    );
+
+    await vi.advanceTimersByTimeAsync(800);
+    expect(waiterStarted).toHaveBeenCalledOnce();
+    expect(setOutput).not.toHaveBeenCalledWith('force_continued', '1');
+
+    await vi.advanceTimersByTimeAsync(199);
+    expect(setOutput).not.toHaveBeenCalledWith('force_continued', '1');
+
+    await vi.advanceTimersByTimeAsync(1);
+    await result;
+
+    expect(setOutput).toHaveBeenCalledWith('force_continued', '1');
+    expect(setFailed).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it.each([

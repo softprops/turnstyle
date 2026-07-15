@@ -941,7 +941,7 @@ describe('wait', () => {
           await waitPromise;
 
           assert.deepStrictEqual(messages, [
-            `🔎 Waiting for ${input.initialWaitSeconds} seconds before checking for runs again...`,
+            `🔎 Waiting until the ${input.initialWaitSeconds}-second initial discovery window expires before checking again...`,
             '✋Awaiting run 1 ...',
           ]);
         } finally {

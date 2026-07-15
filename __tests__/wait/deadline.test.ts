@@ -130,6 +130,25 @@ describe('wait deadlines', () => {
     },
   );
 
+  it('describes initial wait as one discovery window instead of a new full-duration sleep', async () => {
+    const messages: string[] = [];
+    const waitPromise = waiter(
+      input({ continueAfterSeconds: 1, initialWaitSeconds: 60 }),
+      client({ runs: vi.fn().mockResolvedValue([]) }),
+      messages,
+    ).wait();
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(messages).toContain(
+      '🔎 Waiting until the 60-second initial discovery window expires before checking again...',
+    );
+    expect(messages).not.toContain('🔎 Waiting for 60 seconds before checking for runs again...');
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(waitPromise).resolves.toBe(1);
+  });
+
   it('counts discovery time against the deadline before polling', async () => {
     const currentRun = deferredPromise<WorkflowRun>();
     const waitPromise = waiter(

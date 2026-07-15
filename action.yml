@@ -15,9 +15,9 @@ inputs:
   poll-interval-seconds:
     description: "Number of seconds to wait in between checks for previous run completion (defaults to 60)"
   continue-after-seconds:
-    description: "Maximum elapsed seconds, including API reads and sleeps, before moving forward (unbound by default). Mutually exclusive with abort-after-seconds"
+    description: "Maximum elapsed seconds, starting before the first Actions API read and including later API reads and sleeps, before moving forward (unbound by default). Mutually exclusive with abort-after-seconds"
   abort-after-seconds:
-    description: "Maximum elapsed seconds, including API reads and sleeps, before failing the step (unbound by default). Mutually exclusive with continue-after-seconds"
+    description: "Maximum elapsed seconds, starting before the first Actions API read and including later API reads and sleeps, before failing the step (unbound by default). Mutually exclusive with continue-after-seconds"
   same-branch-only:
     description: "Only wait on other runs from the same branch (defaults to true)"
   branch:

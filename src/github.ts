@@ -89,11 +89,12 @@ export class OctokitGitHub {
     });
   }
 
-  workflows = async (owner: string, repo: string) =>
+  workflows = async (owner: string, repo: string, requestOptions: GitHubRequestOptions = {}) =>
     this.octokit.paginate(this.octokit.actions.listRepoWorkflows, {
       owner,
       repo,
       per_page: 100,
+      ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
     });
 
   run = async (
