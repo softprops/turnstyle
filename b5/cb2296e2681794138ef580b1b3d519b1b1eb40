@@ -1,0 +1,55 @@
+action.yml
+  s_87941aaa79a704::t_4e2ec55efa77ae 18,20,30
+CHANGELOG.md
+  s_87941aaa79a704::t_4e2ec55efa77ae 3-6
+__tests__/wait.test.ts
+  s_87941aaa79a704::t_f92cbc00f8572b 1151
+AGENTS.md
+  s_87941aaa79a704::t_4e2ec55efa77ae 21-26
+src/github.ts
+  s_87941aaa79a704::t_6e50abf142c337 20,28-29,209-214,221,227-232,237
+__tests__/wait/predecessor-selection.test.ts
+  s_87941aaa79a704::t_0a2e7e6047f64a 1-85,87-91,93-110
+  s_87941aaa79a704::t_9e7bc9229bda3f 86,92
+src/wait.ts
+  s_87941aaa79a704::t_06323e35ff7909 124-135,142-174,181,184,192,199,217,221,224-229,232-235,237,239,241,243,248-250,252-290,293-298,300-305,309-315,317-320,322-325,328-337,339,341-344,347-383,385-392,398,404-414,416-417,419-421,423-437,439-442,444-448,450-461,463-464,466-468,471-503,505,507-515,519,524-526,529-533,538-539,541-546,548-562,565-566
+  s_87941aaa79a704::t_29159111b76615 183,236,238,240,242,245,321,534
+vitest.config.ts
+  s_87941aaa79a704::t_fafe866d16c025 10-13
+tsconfig.test.json
+  s_87941aaa79a704::t_8e80ec5b03dad2 5-6
+tsconfig.json
+  s_87941aaa79a704::t_8e80ec5b03dad2 26,37-38,46
+__tests__/github.test.ts
+  s_87941aaa79a704::t_8e80ec5b03dad2 213-241,451-460,465-466
+  s_87941aaa79a704::t_7c71a6283ee035 461-464
+__tests__/main.test.ts
+  s_87941aaa79a704::t_9e7bc9229bda3f 93
+  s_87941aaa79a704::t_fca4844250965e 76-81,83-86
+  s_87941aaa79a704::t_a48da1fbf248aa 15,44,75,82,87-92,94-109
+  s_87941aaa79a704::t_f314dea2691f3c 110
+__tests__/wait/deadline.test.ts
+  s_87941aaa79a704::t_0a2e7e6047f64a 277-286
+  s_87941aaa79a704::t_96616f08a0ea23 306
+  s_87941aaa79a704::t_8351ed79d1bea8 1-276,287-305,307
+README.md
+  s_87941aaa79a704::t_4e2ec55efa77ae 54-57,266-267,271
+dist/index.js
+  s_87941aaa79a704::t_c443df9c7bcd28 1-7,9-11,13-14,16,18,20-22,27,29,40-41,45-46,56,58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b5cb2296e2681794138ef580b1b3d519b1b1eb40",
+  "prompts": {},
+  "sessions": {
+    "s_87941aaa79a704": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6569-1f13-7b83-a72a-d4c5039245fc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
