@@ -9,7 +9,21 @@ const errorStatus = (error: unknown): number | undefined =>
     ? (error as { status: number }).status
     : undefined;
 
+const errorMessage = (error: unknown): string =>
+  error instanceof Error
+    ? error.message
+    : typeof (error as { message?: unknown } | null)?.message === 'string'
+      ? (error as { message: string }).message
+      : '';
+
+const isSecondaryRateLimit = (error: unknown): boolean =>
+  /\bsecondary rate\b/i.test(errorMessage(error));
+
 const primaryRateLimitDelaySeconds = (error: unknown): number | undefined => {
+  if (isSecondaryRateLimit(error)) {
+    return undefined;
+  }
+
   const status = errorStatus(error);
   if (status !== 403 && status !== 429) {
     return undefined;
@@ -25,8 +39,13 @@ const primaryRateLimitDelaySeconds = (error: unknown): number | undefined => {
     return undefined;
   }
 
-  const resetAtSeconds = Number(resetHeader);
-  if (!Number.isFinite(resetAtSeconds)) {
+  const normalizedReset = resetHeader.trim();
+  if (!/^\d+$/.test(normalizedReset)) {
+    return undefined;
+  }
+
+  const resetAtSeconds = Number(normalizedReset);
+  if (!Number.isSafeInteger(resetAtSeconds)) {
     return undefined;
   }
 

@@ -273,6 +273,61 @@ describe('github', () => {
         'Retrying after 0 seconds!',
       ]);
     });
+
+    it('does not reinterpret a secondary limit as a primary limit', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+      const resetAtSeconds = Math.floor(Date.now() / 1000) + 600;
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ message: 'You have exceeded a secondary rate limit' }), {
+          status: 403,
+          headers: {
+            'content-type': 'application/json',
+            'retry-after': '60',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': String(resetAtSeconds),
+          },
+        }),
+      );
+      const controller = new AbortController();
+      const request = new OctokitGitHub('fake-token').run('org', 'repo', 42, {
+        signal: controller.signal,
+      });
+      const rejection = request.then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      const settled = vi.fn();
+      void request.then(settled, settled);
+
+      try {
+        await advanceUntilCalled(fetchMock);
+        await flushShortDelayWorkUntilCalled(settled);
+
+        expect(settled).toHaveBeenCalledOnce();
+        await expect(rejection).resolves.toMatchObject({
+          message: 'You have exceeded a secondary rate limit',
+          status: 403,
+        });
+        expect(fetchMock).toHaveBeenCalledOnce();
+        const messages = vi
+          .mocked(warning)
+          .mock.calls.map(([message]) => (typeof message === 'string' ? message : message.message));
+        expect(
+          messages.filter((message) =>
+            message.startsWith('Secondary rate limit detected for request'),
+          ),
+        ).toHaveLength(1);
+        expect(messages.filter((message) => message.startsWith('Retrying after'))).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(600_000);
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        controller.abort();
+        await request.catch(() => undefined);
+      }
+    });
   });
 
   describe('API wrappers', () => {

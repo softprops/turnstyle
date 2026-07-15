@@ -52,6 +52,7 @@ describe('abortable retry scheduling', () => {
   it.each([
     ['a client error', Object.assign(new Error('client error'), { status: 429 })],
     ['an error without a status', new Error('network error')],
+    ['a non-Error rejection', { status: 429 }],
   ])('does not retry %s', async (_description, error) => {
     const operation = vi.fn().mockRejectedValue(error);
 
@@ -214,9 +215,57 @@ describe('abortable retry scheduling', () => {
   });
 
   it.each([
+    ['You have exceeded a secondary rate limit', 403],
+    ['SECONDARY RATE LIMIT', 429],
+    ['secondary rate', 403],
+  ])(
+    'does not reinterpret secondary-limit message %j as a primary limit',
+    async (message, status) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+      const controller = new AbortController();
+      const details = {
+        status,
+        response: {
+          headers: {
+            'retry-after': '60',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 600),
+          },
+        },
+      };
+      const error =
+        status === 429 ? { message, ...details } : Object.assign(new Error(message), details);
+      const operation = vi.fn().mockRejectedValue(error);
+      const onPrimaryRateLimitRetry = vi.fn();
+      const result = retryRequest(operation, 0, controller.signal, onPrimaryRateLimitRetry);
+      const settled = vi.fn();
+      void result.then(settled, (reason: unknown) => settled('rejected', reason));
+
+      try {
+        await flushMicrotasks();
+
+        expect(settled).toHaveBeenCalledWith('rejected', error);
+        expect(operation).toHaveBeenCalledOnce();
+        expect(onPrimaryRateLimitRetry).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        controller.abort();
+        await result.catch(() => undefined);
+      }
+    },
+  );
+
+  it.each([
     ['a missing reset header', undefined],
     ['an empty reset header', ''],
     ['a malformed reset header', 'not-a-number'],
+    ['a whitespace-only reset header', ' '],
+    ['a negative reset header', '-1'],
+    ['a fractional reset header', '1.5'],
+    ['an exponential reset header', '1e9'],
+    ['a hexadecimal reset header', '0x10'],
+    ['an unsafe-integer reset header', String(Number.MAX_SAFE_INTEGER + 1)],
   ])('does not schedule a primary retry for %s', async (_description, resetAtSeconds) => {
     vi.useFakeTimers();
     const controller = new AbortController();
