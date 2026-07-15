@@ -112,6 +112,7 @@ const clientWithDynamicRunPages = (
 
 describe('github', () => {
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     vi.clearAllMocks();
   });
@@ -139,6 +140,31 @@ describe('github', () => {
   });
 
   describe('API wrappers', () => {
+    it.each([
+      ['the default GitHub API', undefined, 'https://api.github.com'],
+      [
+        'a configured GitHub Enterprise API',
+        'https://github.example/api/v3',
+        'https://github.example/api/v3',
+      ],
+    ] as const)('uses %s base URL', async (_description, configuredUrl, expectedUrl) => {
+      vi.stubEnv('GITHUB_API_URL', configuredUrl);
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ id: 42 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+
+      await new OctokitGitHub('fake-token').run('org', 'repo', 42);
+
+      const request = fetchMock.mock.calls[0]?.[0];
+      expect(request).toBeDefined();
+      expect(request instanceof Request ? request.url : String(request)).toBe(
+        `${expectedUrl}/repos/org/repo/actions/runs/42`,
+      );
+    });
+
     it('paginates workflows with repository coordinates and forwards an abort signal', async () => {
       const listRepoWorkflows = vi.fn();
       const paginate = vi
