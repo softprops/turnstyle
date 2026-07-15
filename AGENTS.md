@@ -22,6 +22,7 @@
 
 - Create the shared `continue-after-seconds` or `abort-after-seconds` deadline in `main.ts` after parsing inputs and before the first Actions API read.
 - Treat the limit as a monotonic total-elapsed-time deadline across repository workflow lookup, workflow-run discovery, job and step reads, and sleeps.
+- Start the separate `initial-wait-seconds` window when workflow-run discovery begins; do not let repository workflow lookup consume it, and keep its sleep bounded by the shared action deadline.
 - Propagate the shared deadline signal through every potentially blocking Actions API read.
 - Keep GitHub API retry backoffs on the shared abortable, chunk-safe scheduler so a deadline does not leave an Octokit retry timer running.
 - On an ordinary terminal failure, cancel the shared signal before reporting the original error; keep cancellation separate from deadline expiration and timer disposal.

@@ -270,7 +270,7 @@ jobs:
 | `poll-interval-seconds`  | number  | Number of seconds to wait in between checks for previous run completion (defaults to 60)                                                    |
 | `same-branch-only`       | boolean | Only wait on other runs from the same branch (defaults to true)                                                                             |
 | `branch`                 | string  | Branch name to use for same-branch filtering (defaults to the current branch)                                                               |
-| `initial-wait-seconds`   | number  | Total elapsed seconds within which the action refreshes current runs when none are found initially; bounded by any continue or abort deadline |
+| `initial-wait-seconds`   | number  | Seconds from the start of workflow-run discovery within which the action refreshes current runs when none are found initially; bounded by any continue or abort deadline |
 | `job-to-wait-for`        | string  | Name of the workflow's job to wait for (unbound by default).                                                                                |
 | `step-to-wait-for`       | string  | Name of the step to wait for (unbound by default). Requires job-to-wait-for to be set.                                                      |
 | `queue-name`             | string  | Custom substring used to group matching runs across workflows (defaults to the current workflow only).                                      |

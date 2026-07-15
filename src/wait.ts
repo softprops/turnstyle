@@ -267,6 +267,8 @@ export class Waiter implements Wait {
   };
 
   private waitForCompletion = async (): Promise<void> => {
+    const initialDiscoveryStartedAtSeconds = this.timing.now() / 1000;
+
     while (true) {
       const { currentRun, filteredRuns } = await this.discoverRuns();
 
@@ -304,11 +306,17 @@ export class Waiter implements Wait {
         if (!deadline) {
           throw new Error('Wait deadline has not been initialized');
         }
-        if (!deadline.hasElapsedSeconds(this.input.initialWaitSeconds)) {
+        const initialDiscoveryElapsedSeconds = Math.max(
+          0,
+          this.timing.now() / 1000 - initialDiscoveryStartedAtSeconds,
+        );
+        if (initialDiscoveryElapsedSeconds < this.input.initialWaitSeconds) {
           this.info(
             `🔎 Waiting until the ${this.input.initialWaitSeconds}-second initial discovery window expires before checking again...`,
           );
-          await deadline.sleepUntilElapsedSeconds(this.input.initialWaitSeconds);
+          await deadline.sleepSeconds(
+            this.input.initialWaitSeconds - initialDiscoveryElapsedSeconds,
+          );
           continue;
         }
         return;

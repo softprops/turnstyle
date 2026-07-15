@@ -1,6 +1,7 @@
 import { setOutput } from '@actions/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ActionDeadline, systemDeadlineTiming } from '../../src/deadline';
 import type { WorkflowJob, WorkflowRun, WorkflowStep } from '../../src/github';
 import type { Input } from '../../src/input';
 import { retryRequest } from '../../src/retry';
@@ -148,6 +149,72 @@ describe('wait deadlines', () => {
 
     await vi.advanceTimersByTimeAsync(1_000);
     await expect(waitPromise).resolves.toBe(1);
+  });
+
+  it('starts the initial discovery window after pre-wait lifecycle work', async () => {
+    const waiterInput = input({ continueAfterSeconds: 10, initialWaitSeconds: 1 });
+    const deadline = ActionDeadline.fromInput(waiterInput);
+    await vi.advanceTimersByTimeAsync(2_000);
+    const runs = vi.fn().mockResolvedValue([]);
+    const waitPromise = new Waiter(
+      workflowId,
+      client({ runs }),
+      waiterInput,
+      vi.fn(),
+      vi.fn(),
+      systemDeadlineTiming,
+      deadline,
+    ).wait();
+
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runs).toHaveBeenCalledOnce();
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(runs).toHaveBeenCalledOnce();
+
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(waitPromise).resolves.toBeUndefined();
+      expect(runs).toHaveBeenCalledTimes(2);
+    } finally {
+      deadline.dispose();
+      await waitPromise.catch(() => undefined);
+    }
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('bounds the separate initial discovery window by the remaining action deadline', async () => {
+    const waiterInput = input({ continueAfterSeconds: 3, initialWaitSeconds: 5 });
+    const deadline = ActionDeadline.fromInput(waiterInput);
+    await vi.advanceTimersByTimeAsync(2_000);
+    const runs = vi.fn().mockResolvedValue([]);
+    const waitPromise = new Waiter(
+      workflowId,
+      client({ runs }),
+      waiterInput,
+      vi.fn(),
+      vi.fn(),
+      systemDeadlineTiming,
+      deadline,
+    ).wait();
+    const settled = observeSettlement(waitPromise);
+
+    try {
+      await vi.advanceTimersByTimeAsync(999);
+      expect(settled).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toHaveBeenCalledWith('fulfilled', 3);
+      await expect(waitPromise).resolves.toBe(3);
+      expect(runs).toHaveBeenCalledOnce();
+      expect(setOutput).toHaveBeenCalledWith('force_continued', '1');
+    } finally {
+      deadline.dispose();
+      await waitPromise.catch(() => undefined);
+    }
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('counts discovery time against the deadline before polling', async () => {

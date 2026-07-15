@@ -89,10 +89,6 @@ export class ActionDeadline {
     this.scheduleDeadlineChunk();
   }
 
-  elapsedSeconds = (): number => Math.max(0, this.timing.now() / 1000 - this.startedAtSeconds);
-
-  hasElapsedSeconds = (seconds: number): boolean => this.elapsedSeconds() >= seconds;
-
   private delayUntil = (targetSeconds: number): number => {
     const remainingSeconds = targetSeconds - this.timing.now() / 1000;
     if (remainingSeconds <= 0) {
@@ -225,9 +221,6 @@ export class ActionDeadline {
 
   sleepSeconds = async (seconds: number, signal?: AbortSignal): Promise<void> =>
     this.sleepUntilSeconds(this.timing.now() / 1000 + seconds, signal);
-
-  sleepUntilElapsedSeconds = async (seconds: number): Promise<void> =>
-    this.sleepUntilSeconds(this.startedAtSeconds + seconds);
 
   cancel = (reason?: unknown): void => {
     this.controller.abort(reason);
