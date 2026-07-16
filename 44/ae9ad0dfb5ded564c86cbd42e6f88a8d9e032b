@@ -1,0 +1,48 @@
+AGENTS.md
+  s_87941aaa79a704::t_552a493c25ab69 26
+__tests__/retry.test.ts
+  s_87941aaa79a704::t_2328c44eaeac60 3,12-36,121-129,131-136,141-143,145-150
+  s_87941aaa79a704::t_1787d75b3693e5 130
+  s_87941aaa79a704::t_552a493c25ab69 137-140,144
+__tests__/wait.test.ts
+  s_87941aaa79a704::t_9b79fefc5593c3 1293-1296,1302-1305,1478-1481
+__tests__/github.test.ts
+  s_87941aaa79a704::t_2328c44eaeac60 4,83-107,540-579
+  s_87941aaa79a704::t_01224637c962ff 580-581
+src/wait.ts
+  s_87941aaa79a704::t_552a493c25ab69 193-195,201,210-219,221-225,231-232,234,236-237,239-242,247-248,250-260,262-263,265,331-337
+  s_87941aaa79a704::t_08cd26859811a6 343-344
+src/retry.ts
+  s_87941aaa79a704::t_552a493c25ab69 73,79,81,83,85-87,108,110-115
+__tests__/wait/deadline.test.ts
+  s_87941aaa79a704::t_2328c44eaeac60 4,78-102,267-296
+  s_87941aaa79a704::t_40dc76cb196844 297-298
+CHANGELOG.md
+  s_87941aaa79a704::t_552a493c25ab69 7
+__tests__/main.test.ts
+  s_87941aaa79a704::t_9b79fefc5593c3 62
+src/main.ts
+  s_87941aaa79a704::t_2c1d34f92e1b61 43-44,50,53,56,60,63,65,68
+  s_87941aaa79a704::t_552a493c25ab69 4,13,54-55,57
+src/github.ts
+  s_87941aaa79a704::t_552a493c25ab69 55,58-68,70,74-76,136,143,157,162,189,276,287,292
+  s_87941aaa79a704::t_1787d75b3693e5 71-72,79-80
+dist/index.js
+  s_87941aaa79a704::t_c3986070f5cd5a 1-7,9-10,14,16,22,27,29,34,40-41,45-46,56,58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "44ae9ad0dfb5ded564c86cbd42e6f88a8d9e032b",
+  "prompts": {},
+  "sessions": {
+    "s_87941aaa79a704": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6569-1f13-7b83-a72a-d4c5039245fc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
