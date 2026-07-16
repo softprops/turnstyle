@@ -2,29 +2,36 @@ import { warning } from '@actions/core';
 import { retry } from '@octokit/plugin-retry';
 import { throttling } from '@octokit/plugin-throttling';
 import { Octokit } from '@octokit/rest';
-import type { EndpointDefaults, Endpoints, RequestParameters } from '@octokit/types';
+import type {
+  EndpointDefaults,
+  Endpoints,
+  RequestInterface,
+  RequestParameters,
+} from '@octokit/types';
+import { retryRequest } from './retry';
 
 const ThrottledOctokit = Octokit.plugin(throttling, retry);
 const MAX_WORKFLOW_RUN_PAGES = 50;
 const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'] as const;
 const ACTIVE_RUN_STATUS_SET = new Set<string>(ACTIVE_RUN_STATUSES);
-const DO_NOT_RETRY_STATUS_CODES = Array.from({ length: 100 }, (_, index) => 400 + index);
 type ThrottleRequestOptions = Pick<Required<EndpointDefaults>, 'method' | 'url'>;
 
-export const createThrottleOptions = () => ({
+export const createThrottleOptions = (retryThroughPlugin: boolean = true) => ({
   onRateLimit: (
     retryAfter: number,
     options: ThrottleRequestOptions,
     _octokit: unknown,
     retryCount: number,
-  ) => {
+  ): true | undefined => {
     warning(`Request quota exhausted for request ${options.method} ${options.url}`);
 
-    if (retryCount < 1) {
+    if (retryCount < 1 && retryThroughPlugin) {
       // only retries once
       warning(`Retrying after ${retryAfter} seconds!`);
       return true;
     }
+
+    return undefined;
   },
   onSecondaryRateLimit: (_retryAfter: number, options: ThrottleRequestOptions) => {
     // does not retry, only logs a warning
@@ -45,7 +52,32 @@ export interface WorkflowRunFilters {
 
 export interface GitHubRequestOptions {
   signal?: AbortSignal;
+  checkDeadline?: () => void;
 }
+
+const presentRequestOptions = (
+  requestOptions: GitHubRequestOptions,
+): GitHubRequestOptions | undefined => {
+  const options: GitHubRequestOptions = {
+    ...(requestOptions.signal ? { signal: requestOptions.signal } : {}),
+    ...(requestOptions.checkDeadline ? { checkDeadline: requestOptions.checkDeadline } : {}),
+  };
+  return options.signal || options.checkDeadline ? options : undefined;
+};
+
+const bindRequestOptions = <T extends RequestInterface>(
+  request: T,
+  requestOptions: GitHubRequestOptions,
+): T => {
+  const options = presentRequestOptions(requestOptions);
+  // The pagination plugin reconstructs each page request from method, URL,
+  // and headers. Binding lifecycle options into the method defaults keeps the
+  // signal and monotonic checkpoint present when those reduced page options
+  // pass through the request and retry hooks.
+  // `.defaults()` preserves the endpoint's request and response contract, but
+  // its public return type does not retain the endpoint method's subtype.
+  return (options ? request.defaults({ request: options }) : request) as T;
+};
 
 const matchesWorkflowRunFilters = (run: WorkflowRun, filters: WorkflowRunFilters) => {
   if (!ACTIVE_RUN_STATUS_SET.has(run.status || '')) {
@@ -74,25 +106,47 @@ export class OctokitGitHub {
     this.octokit = new ThrottledOctokit({
       baseUrl: process.env['GITHUB_API_URL'] || 'https://api.github.com',
       auth: githubToken,
-      // retries defaults to 0, which disables the retry plugin entirely (no
-      // request wrapping). When set, it retries transient 5xx errors with
-      // backoff. All 4xx responses are excluded so permanent client errors and
-      // rate limits do not retry through plugin-retry.
+      // Turnstyle installs its equivalent request hook below so a shared
+      // action signal can cancel 5xx backoff. Disable plugin-retry's private
+      // Bottleneck timer while retaining the plugin dependency and API shape.
       retry: {
-        enabled: retries > 0,
-        retries,
-        doNotRetry: DO_NOT_RETRY_STATUS_CODES,
+        enabled: false,
       },
-      throttle: createThrottleOptions(),
+      // The callback keeps the existing warning behavior but declines the
+      // plugin's private retry timer. The request hook below applies the same
+      // retry policy through Turnstyle's abortable scheduler.
+      throttle: createThrottleOptions(false),
+    });
+
+    this.octokit.hook.wrap('request', (request, options) => {
+      return retryRequest(
+        (retryCount) =>
+          Promise.resolve(
+            request({
+              ...options,
+              request: {
+                ...options.request,
+                retryCount,
+              },
+            }),
+          ),
+        retries,
+        options.request.signal,
+        (delaySeconds) => warning(`Retrying after ${delaySeconds} seconds!`),
+        options.request.checkDeadline,
+      );
     });
   }
 
-  workflows = async (owner: string, repo: string) =>
-    this.octokit.paginate(this.octokit.actions.listRepoWorkflows, {
-      owner,
-      repo,
-      per_page: 100,
-    });
+  workflows = async (owner: string, repo: string, requestOptions: GitHubRequestOptions = {}) =>
+    this.octokit.paginate(
+      bindRequestOptions(this.octokit.actions.listRepoWorkflows, requestOptions),
+      {
+        owner,
+        repo,
+        per_page: 100,
+      },
+    );
 
   run = async (
     owner: string,
@@ -100,11 +154,12 @@ export class OctokitGitHub {
     run_id: number,
     requestOptions: GitHubRequestOptions = {},
   ): Promise<WorkflowRun> => {
+    const lifecycleOptions = presentRequestOptions(requestOptions);
     const { data } = await this.octokit.actions.getWorkflowRun({
       owner,
       repo,
       run_id,
-      ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
+      ...(lifecycleOptions ? { request: lifecycleOptions } : {}),
     });
     return data as WorkflowRun;
   };
@@ -131,12 +186,11 @@ export class OctokitGitHub {
       ACTIVE_RUN_STATUSES.map(async (status) => {
         let pagesScanned = 0;
         const runs = await paginateWorkflowRuns(
-          listRuns,
+          bindRequestOptions(listRuns, requestOptions),
           {
             ...baseOptions,
             ...(filters.branch ? { branch: filters.branch } : {}),
             status,
-            ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
           },
           (response: { data: WorkflowRun[] }, done: () => void) => {
             pagesScanned += 1;
@@ -204,7 +258,12 @@ export class OctokitGitHub {
     );
   };
 
-  jobs = async (owner: string, repo: string, run_id: number) => {
+  jobs = async (
+    owner: string,
+    repo: string,
+    run_id: number,
+    requestOptions: GitHubRequestOptions = {},
+  ) => {
     const options: Endpoints['GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs']['parameters'] =
       {
         owner,
@@ -213,14 +272,24 @@ export class OctokitGitHub {
         per_page: 100,
       };
 
-    return this.octokit.paginate(this.octokit.actions.listJobsForWorkflowRun, options);
+    return this.octokit.paginate(
+      bindRequestOptions(this.octokit.actions.listJobsForWorkflowRun, requestOptions),
+      options,
+    );
   };
 
-  steps = async (owner: string, repo: string, job_id: number) => {
+  steps = async (
+    owner: string,
+    repo: string,
+    job_id: number,
+    requestOptions: GitHubRequestOptions = {},
+  ) => {
+    const lifecycleOptions = presentRequestOptions(requestOptions);
     const options: Endpoints['GET /repos/{owner}/{repo}/actions/jobs/{job_id}']['parameters'] = {
       owner,
       repo,
       job_id,
+      ...(lifecycleOptions ? { request: lifecycleOptions } : {}),
     };
     const { data: job } = await this.octokit.actions.getJobForWorkflowRun(options);
     return job.steps || [];

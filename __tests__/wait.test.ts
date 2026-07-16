@@ -941,7 +941,7 @@ describe('wait', () => {
           await waitPromise;
 
           assert.deepStrictEqual(messages, [
-            `🔎 Waiting for ${input.initialWaitSeconds} seconds before checking for runs again...`,
+            `🔎 Waiting until the ${input.initialWaitSeconds}-second initial discovery window expires before checking again...`,
             '✋Awaiting run 1 ...',
           ]);
         } finally {
@@ -1148,7 +1148,7 @@ describe('wait', () => {
         await waiter.wait();
 
         expect(messages).toEqual([
-          'Step missing-step not found in job 7, awaiting full run for safety',
+          'Step missing-step not found in job 7, awaiting job completion for safety',
           '✋Awaiting job run completion from job job-url ...',
         ]);
       });
@@ -1285,12 +1285,25 @@ describe('wait', () => {
 
           await waiter.wait();
 
-          expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', workflow1.id, {
-            branch: undefined,
-          });
-          expect(activeRunsForRepo).toHaveBeenCalledWith('org', 'repo', {
-            branch: undefined,
-          });
+          expect(mockedRunsFunc).toHaveBeenCalledWith(
+            'org',
+            'repo',
+            workflow1.id,
+            { branch: undefined },
+            {
+              checkDeadline: expect.any(Function),
+              signal: expect.any(AbortSignal),
+            },
+          );
+          expect(activeRunsForRepo).toHaveBeenCalledWith(
+            'org',
+            'repo',
+            { branch: undefined },
+            {
+              checkDeadline: expect.any(Function),
+              signal: expect.any(AbortSignal),
+            },
+          );
 
           const hasSearchMessage = debugMessages.some((msg) =>
             msg.includes('Searching active workflow runs across repository'),
@@ -1457,9 +1470,16 @@ describe('wait', () => {
           expect(hasSearchMessage).toBe(false);
           const hasQueueMessage = debugMessages.some((msg) => msg.includes('matches queue'));
           expect(hasQueueMessage).toBe(false);
-          expect(mockedRunsFunc).toHaveBeenCalledWith('org', 'repo', workflow1.id, {
-            branch: undefined,
-          });
+          expect(mockedRunsFunc).toHaveBeenCalledWith(
+            'org',
+            'repo',
+            workflow1.id,
+            { branch: undefined },
+            {
+              checkDeadline: expect.any(Function),
+              signal: expect.any(AbortSignal),
+            },
+          );
         });
 
         it('keeps queue-name discovery bounded on repositories with many workflows', async () => {

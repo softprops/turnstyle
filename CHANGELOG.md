@@ -1,5 +1,13 @@
 ## Unreleased
 
+### Bug fixes 🐛
+
+- Enforce `continue-after-seconds` and `abort-after-seconds` as total elapsed-time deadlines starting before the first Actions API read and covering workflow discovery, job and step reads, initial waiting, and polling.
+- Keep the `initial-wait-seconds` discovery window anchored to workflow-run discovery so repository workflow lookup does not consume its retry opportunity, while still bounding it by the action deadline.
+- Safely chunk long timer delays and check the monotonic boundary before follow-up discovery reads, pagination pages, and retries so timer overflow or delayed callbacks cannot shorten or extend the configured deadline.
+- Cancel queued GitHub API retry backoffs when the shared deadline expires or an ordinary terminal API failure ends the action, instead of allowing their timers to keep the step running.
+- Keep configured 5xx retries independent from the one primary-rate-limit retry, and avoid retrying primary limits with missing or malformed reset headers.
+
 ## 3.3.2
 
 ### Bug fixes 🐛

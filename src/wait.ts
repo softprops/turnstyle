@@ -1,4 +1,11 @@
 import { setOutput } from '@actions/core';
+import {
+  ActionDeadline,
+  DeadlineReached,
+  handleDeadline,
+  systemDeadlineTiming,
+  type DeadlineTiming,
+} from './deadline';
 import type {
   GitHubRequestOptions,
   WorkflowJob,
@@ -121,8 +128,18 @@ export interface WaiterGitHubClient {
     filters?: WorkflowRunFilters,
     requestOptions?: GitHubRequestOptions,
   ): Promise<WorkflowRun[]>;
-  jobs(owner: string, repo: string, runId: number): Promise<WorkflowJob[]>;
-  steps(owner: string, repo: string, jobId: number): Promise<WorkflowStep[]>;
+  jobs(
+    owner: string,
+    repo: string,
+    runId: number,
+    requestOptions?: GitHubRequestOptions,
+  ): Promise<WorkflowJob[]>;
+  steps(
+    owner: string,
+    repo: string,
+    jobId: number,
+    requestOptions?: GitHubRequestOptions,
+  ): Promise<WorkflowStep[]>;
 }
 
 export interface Wait {
@@ -135,7 +152,10 @@ export class Waiter implements Wait {
   private readonly input: Input;
   private readonly githubClient: WaiterGitHubClient;
   private readonly workflowId: number;
+  private readonly timing: DeadlineTiming;
+  private readonly sharedDeadline: ActionDeadline | undefined;
   private previousRunOutput: WorkflowRun | undefined;
+  private deadline: ActionDeadline | undefined;
 
   constructor(
     workflowId: number,
@@ -143,12 +163,16 @@ export class Waiter implements Wait {
     input: Input,
     info: (msg: string) => void,
     debug: (msg: string) => void,
+    timing: DeadlineTiming = systemDeadlineTiming,
+    deadline?: ActionDeadline,
   ) {
     this.workflowId = workflowId;
     this.input = input;
     this.githubClient = githubClient;
     this.info = info;
     this.debug = debug;
+    this.timing = timing;
+    this.sharedDeadline = deadline;
   }
 
   private setPreviousRunOutput = (run: WorkflowRun) => {
@@ -166,252 +190,242 @@ export class Waiter implements Wait {
     }
   };
 
-  private abortError = (elapsedSeconds: number): Error => {
-    this.info(`🛑Exceeded wait seconds. Aborting...`);
-    setOutput('force_continued', '');
-    this.clearPreviousRunOutput();
-    return new Error(`Aborted after waiting ${elapsedSeconds} seconds`);
-  };
-
-  private abort = (elapsedSeconds: number): never => {
-    throw this.abortError(elapsedSeconds);
-  };
-
-  private withAbortTimeout = async <T>(
-    elapsedSeconds: number,
-    operation: (signal: AbortSignal | undefined) => Promise<T>,
+  private withDeadline = async <T>(
+    operation: (requestOptions: GitHubRequestOptions) => Promise<T>,
   ): Promise<T> => {
-    if (this.input.abortAfterSeconds === undefined) {
-      return operation(undefined);
+    const deadline = this.deadline;
+    if (!deadline) {
+      throw new Error('Wait deadline has not been initialized');
     }
 
-    const abortAtSeconds = this.input.abortAfterSeconds;
-    if (elapsedSeconds >= abortAtSeconds) {
-      this.abort(elapsedSeconds);
-    }
-
-    const remainingMilliseconds = (abortAtSeconds - elapsedSeconds) * 1000;
-    const controller = new AbortController();
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeout = setTimeout(() => {
-        controller.abort();
-        reject(this.abortError(abortAtSeconds));
-      }, remainingMilliseconds);
-    });
-
-    try {
-      return await Promise.race([operation(controller.signal), timeoutPromise]);
-    } finally {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-    }
+    return deadline.race((signal) => operation({ signal, checkDeadline: deadline.throwIfReached }));
   };
 
-  wait = async (secondsSoFar?: number): Promise<number | undefined> => {
-    const elapsedSeconds = secondsSoFar || 0;
-
-    if (
-      this.input.continueAfterSeconds !== undefined &&
-      elapsedSeconds >= this.input.continueAfterSeconds
-    ) {
-      this.info(`🤙Exceeded wait seconds. Continuing...`);
-      setOutput('force_continued', '1');
-      this.clearPreviousRunOutput();
-      return elapsedSeconds;
-    }
-
-    if (
-      this.input.abortAfterSeconds !== undefined &&
-      elapsedSeconds >= this.input.abortAfterSeconds
-    ) {
-      this.abort(elapsedSeconds);
-    }
-
+  private discoverRuns = async (): Promise<{
+    currentRun: WorkflowRun | undefined;
+    filteredRuns: WorkflowRun[];
+  }> => {
     this.debug(`Fetching workflow runs for workflow ID: ${this.workflowId}`);
     const queueName = this.input.queueName;
-    const { currentRun, filteredRuns } = await this.withAbortTimeout(
-      elapsedSeconds,
-      async (signal) => {
-        const requestOptions = signal ? { signal } : undefined;
-        let currentRun: WorkflowRun | undefined;
-        try {
-          currentRun = requestOptions
-            ? await this.githubClient.run(
-                this.input.owner,
-                this.input.repo,
-                this.input.runId,
-                requestOptions,
-              )
-            : await this.githubClient.run(this.input.owner, this.input.repo, this.input.runId);
-        } catch (error: unknown) {
-          this.debug(`Failed to fetch current run ${this.input.runId}: ${errorMessage(error)}`);
-        }
+    let currentRun: WorkflowRun | undefined;
+    try {
+      currentRun = await this.withDeadline((requestOptions) =>
+        this.githubClient.run(this.input.owner, this.input.repo, this.input.runId, requestOptions),
+      );
+    } catch (error: unknown) {
+      this.deadline?.throwIfReached();
+      this.deadline?.signal.throwIfAborted();
+      this.debug(`Failed to fetch current run ${this.input.runId}: ${errorMessage(error)}`);
+    }
 
-        const runFilters = {
-          branch: this.input.sameBranchOnly ? this.input.branch : undefined,
-        };
-        const runs = requestOptions
-          ? await this.githubClient.runs(
-              this.input.owner,
-              this.input.repo,
-              this.workflowId,
-              runFilters,
-              requestOptions,
-            )
-          : await this.githubClient.runs(
-              this.input.owner,
-              this.input.repo,
-              this.workflowId,
-              runFilters,
-            );
-
-        this.debug(`Found ${runs.length} ${this.workflowId} runs`);
-
-        currentRun = currentRun || findCurrentRun(runs, this.input);
-        let filteredRuns = filterEligibleRuns(runs, this.input);
-
-        if (queueName) {
-          this.debug(
-            `Searching active workflow runs across repository for queue name: ${queueName}`,
-          );
-          const queueRuns = requestOptions
-            ? await this.githubClient.activeRunsForRepo(
-                this.input.owner,
-                this.input.repo,
-                runFilters,
-                requestOptions,
-              )
-            : await this.githubClient.activeRunsForRepo(
-                this.input.owner,
-                this.input.repo,
-                runFilters,
-              );
-
-          currentRun = currentRun || findCurrentRun(queueRuns, this.input);
-          filteredRuns = filterEligibleRuns(queueRuns, this.input).filter((run) => {
-            const matchesQueue =
-              run.display_title?.includes(queueName) || run.name?.includes(queueName);
-            if (matchesQueue) {
-              this.debug(
-                `Run ${run.id} (${run.display_title || run.name}) matches queue: "${queueName}"`,
-              );
-            }
-            return matchesQueue;
-          });
-
-          this.debug(
-            `After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`,
-          );
-        }
-
-        return { currentRun, filteredRuns };
-      },
+    const runFilters = {
+      branch: this.input.sameBranchOnly ? this.input.branch : undefined,
+    };
+    const runs = await this.withDeadline((requestOptions) =>
+      this.githubClient.runs(
+        this.input.owner,
+        this.input.repo,
+        this.workflowId,
+        runFilters,
+        requestOptions,
+      ),
     );
 
-    const currentRunStartedAt = currentRun ? runTimestamp(currentRun) : undefined;
-    if (currentRunStartedAt !== undefined) {
-      this.debug(
-        'Found current run ' +
-          this.input.runId +
-          ' attempt ' +
-          this.input.runAttempt +
-          ' at ' +
-          new Date(currentRunStartedAt).toISOString(),
-      );
-    }
+    this.debug(`Found ${runs.length} ${this.workflowId} runs`);
 
-    const previousRuns = filteredRuns
-      .filter((run) => isPreviousRun(run, this.input, currentRunStartedAt))
-      .filter((run) => {
-        const isSuccessful: boolean = run.conclusion === 'success';
+    currentRun = currentRun || findCurrentRun(runs, this.input);
+    let filteredRuns = filterEligibleRuns(runs, this.input);
 
-        if (isSuccessful) {
-          this.debug(
-            `Skipping run ${run.id}, status: ${run.status}, conclusion: ${run.conclusion}`,
-          );
-        }
-
-        return !isSuccessful;
-      })
-      .sort(compareRunsNewestFirst)
-      .slice(0, MAX_PREVIOUS_WORKFLOW_RUNS);
-    if (!previousRuns || !previousRuns.length) {
-      setOutput('force_continued', '');
-      this.clearPreviousRunOutput();
-      if (this.input.initialWaitSeconds > 0 && elapsedSeconds < this.input.initialWaitSeconds) {
-        this.info(
-          `🔎 Waiting for ${this.input.initialWaitSeconds} seconds before checking for runs again...`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, this.input.initialWaitSeconds * 1000));
-        return this.wait(elapsedSeconds + this.input.initialWaitSeconds);
-      }
-      return;
-    } else {
-      this.debug(`Found ${previousRuns.length} previous runs`);
-    }
-
-    // Handle if we are checking for a specific job / step to wait for
-    if (this.input.jobToWaitFor) {
-      for (const previousRun of previousRuns) {
-        this.debug(`Fetching jobs for run ${previousRun.id}`);
-        const jobs = await this.githubClient.jobs(
+    if (queueName) {
+      this.debug(`Searching active workflow runs across repository for queue name: ${queueName}`);
+      const queueRuns = await this.withDeadline((requestOptions) =>
+        this.githubClient.activeRunsForRepo(
           this.input.owner,
           this.input.repo,
-          previousRun.id,
+          runFilters,
+          requestOptions,
+        ),
+      );
+
+      currentRun = currentRun || findCurrentRun(queueRuns, this.input);
+      filteredRuns = filterEligibleRuns(queueRuns, this.input).filter((run) => {
+        const matchesQueue =
+          run.display_title?.includes(queueName) || run.name?.includes(queueName);
+        if (matchesQueue) {
+          this.debug(
+            `Run ${run.id} (${run.display_title || run.name}) matches queue: "${queueName}"`,
+          );
+        }
+        return matchesQueue;
+      });
+
+      this.debug(`After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`);
+    }
+
+    return { currentRun, filteredRuns };
+  };
+
+  private waitForCompletion = async (): Promise<void> => {
+    const initialDiscoveryStartedAtSeconds = this.timing.now() / 1000;
+
+    while (true) {
+      const { currentRun, filteredRuns } = await this.discoverRuns();
+
+      const currentRunStartedAt = currentRun ? runTimestamp(currentRun) : undefined;
+      if (currentRunStartedAt !== undefined) {
+        this.debug(
+          'Found current run ' +
+            this.input.runId +
+            ' attempt ' +
+            this.input.runAttempt +
+            ' at ' +
+            new Date(currentRunStartedAt).toISOString(),
         );
-        const job = jobs.find((job) => job.name === this.input.jobToWaitFor);
-        // Now handle if we are checking for a specific step
-        if (this.input.stepToWaitFor && job) {
-          this.debug(`Fetching steps for job ${job.id}`);
-          const steps = await this.githubClient.steps(this.input.owner, this.input.repo, job.id);
-          const step = steps.find((step) => step.name === this.input.stepToWaitFor);
-          if (step && step.status !== 'completed') {
-            this.setPreviousRunOutput(previousRun);
-            this.info(`✋Awaiting step completion from job ${job.html_url} ...`);
-            return this.pollAndWait(secondsSoFar);
-          } else if (step) {
-            this.info(
-              `Step ${this.input.stepToWaitFor} completed from run ${previousRun.html_url}`,
+      }
+
+      const previousRuns = filteredRuns
+        .filter((run) => isPreviousRun(run, this.input, currentRunStartedAt))
+        .filter((run) => {
+          const isSuccessful: boolean = run.conclusion === 'success';
+
+          if (isSuccessful) {
+            this.debug(
+              `Skipping run ${run.id}, status: ${run.status}, conclusion: ${run.conclusion}`,
             );
+          }
+
+          return !isSuccessful;
+        })
+        .sort(compareRunsNewestFirst)
+        .slice(0, MAX_PREVIOUS_WORKFLOW_RUNS);
+      if (previousRuns.length === 0) {
+        setOutput('force_continued', '');
+        this.clearPreviousRunOutput();
+        const deadline = this.deadline;
+        if (!deadline) {
+          throw new Error('Wait deadline has not been initialized');
+        }
+        const initialDiscoveryElapsedSeconds = Math.max(
+          0,
+          this.timing.now() / 1000 - initialDiscoveryStartedAtSeconds,
+        );
+        if (initialDiscoveryElapsedSeconds < this.input.initialWaitSeconds) {
+          this.info(
+            `🔎 Waiting until the ${this.input.initialWaitSeconds}-second initial discovery window expires before checking again...`,
+          );
+          await deadline.sleepSeconds(
+            this.input.initialWaitSeconds - initialDiscoveryElapsedSeconds,
+          );
+          continue;
+        }
+        return;
+      } else {
+        this.debug(`Found ${previousRuns.length} previous runs`);
+      }
+
+      // Handle if we are checking for a specific job / step to wait for
+      if (this.input.jobToWaitFor) {
+        let shouldPoll = false;
+        for (const previousRun of previousRuns) {
+          this.debug(`Fetching jobs for run ${previousRun.id}`);
+          const jobs = await this.withDeadline((requestOptions) =>
+            this.githubClient.jobs(
+              this.input.owner,
+              this.input.repo,
+              previousRun.id,
+              requestOptions,
+            ),
+          );
+          const job = jobs.find((job) => job.name === this.input.jobToWaitFor);
+          // Now handle if we are checking for a specific step
+          if (this.input.stepToWaitFor && job) {
+            this.debug(`Fetching steps for job ${job.id}`);
+            const steps = await this.withDeadline((requestOptions) =>
+              this.githubClient.steps(this.input.owner, this.input.repo, job.id, requestOptions),
+            );
+            const step = steps.find((step) => step.name === this.input.stepToWaitFor);
+            if (step && step.status !== 'completed') {
+              this.setPreviousRunOutput(previousRun);
+              this.info(`✋Awaiting step completion from job ${job.html_url} ...`);
+              shouldPoll = true;
+              break;
+            } else if (step) {
+              this.info(
+                `Step ${this.input.stepToWaitFor} completed from run ${previousRun.html_url}`,
+              );
+              continue;
+            }
+            this.info(
+              `Step ${this.input.stepToWaitFor} not found in job ${job.id}, awaiting job completion for safety`,
+            );
+          }
+
+          if (job && job.status !== 'completed') {
+            this.setPreviousRunOutput(previousRun);
+            this.info(`✋Awaiting job run completion from job ${job.html_url} ...`);
+            shouldPoll = true;
+            break;
+          } else if (job) {
+            this.info(`Job ${this.input.jobToWaitFor} completed from run ${previousRun.html_url}`);
             continue;
           } else {
             this.info(
-              `Step ${this.input.stepToWaitFor} not found in job ${job.id}, awaiting full run for safety`,
+              `Job ${this.input.jobToWaitFor} not found in run ${previousRun.id}, awaiting full run for safety`,
             );
           }
-        }
 
-        if (job && job.status !== 'completed') {
           this.setPreviousRunOutput(previousRun);
-          this.info(`✋Awaiting job run completion from job ${job.html_url} ...`);
-          return this.pollAndWait(secondsSoFar);
-        } else if (job) {
-          this.info(`Job ${this.input.jobToWaitFor} completed from run ${previousRun.html_url}`);
-          continue;
-        } else {
-          this.info(
-            `Job ${this.input.jobToWaitFor} not found in run ${previousRun.id}, awaiting full run for safety`,
-          );
+          this.info(`✋Awaiting run ${previousRun.html_url} ...`);
+          shouldPoll = true;
+          break;
         }
 
+        if (!shouldPoll) {
+          this.clearPreviousRunOutput();
+          return;
+        }
+      } else {
+        const previousRun = previousRuns[0];
         this.setPreviousRunOutput(previousRun);
         this.info(`✋Awaiting run ${previousRun.html_url} ...`);
-        return this.pollAndWait(secondsSoFar);
       }
-      this.clearPreviousRunOutput();
-      return;
-    }
 
-    const previousRun = previousRuns[0];
-    this.setPreviousRunOutput(previousRun);
-    this.info(`✋Awaiting run ${previousRun.html_url} ...`);
-    return this.pollAndWait(secondsSoFar);
+      await this.pollAndWait();
+    }
   };
 
-  pollAndWait = async (secondsSoFar?: number): Promise<number | undefined> => {
-    await new Promise((resolve) => setTimeout(resolve, this.input.pollIntervalSeconds * 1000));
-    return this.wait((secondsSoFar || 0) + this.input.pollIntervalSeconds);
+  wait = async (secondsSoFar: number = 0): Promise<number | undefined> => {
+    const deadline =
+      this.sharedDeadline || ActionDeadline.fromInput(this.input, this.timing, secondsSoFar);
+    const ownsDeadline = !this.sharedDeadline;
+    this.deadline = deadline;
+
+    try {
+      deadline.throwIfReached();
+      await this.waitForCompletion();
+      deadline.throwIfReached();
+      return undefined;
+    } catch (error: unknown) {
+      if (error instanceof DeadlineReached) {
+        return handleDeadline(error, this.info, this.clearPreviousRunOutput);
+      }
+      if (ownsDeadline) {
+        deadline.cancel(error);
+      }
+      throw error;
+    } finally {
+      if (ownsDeadline) {
+        deadline.dispose();
+      }
+      this.deadline = undefined;
+    }
+  };
+
+  pollAndWait = async (): Promise<void> => {
+    const deadline = this.deadline;
+    if (!deadline) {
+      throw new Error('Wait deadline has not been initialized');
+    }
+    await deadline.sleepSeconds(this.input.pollIntervalSeconds);
   };
 }
