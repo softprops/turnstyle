@@ -1,6 +1,7 @@
 import { warning } from '@actions/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { ActionDeadline, DeadlineReached, type DeadlineTiming } from '../src/deadline';
 import {
   createThrottleOptions,
   OctokitGitHub,
@@ -77,6 +78,31 @@ const flushShortDelayWorkUntilCalled = async (mock: ReturnType<typeof vi.fn>) =>
     await vi.advanceTimersByTimeAsync(1);
     await flushMicrotasks();
   }
+};
+
+const manualTiming = () => {
+  let now = 0;
+  let nextTimer = 1;
+  const timers = new Map<number, () => void>();
+  const timing: DeadlineTiming = {
+    now: () => now,
+    setTimeout: (callback) => {
+      const timer = nextTimer++;
+      timers.set(timer, callback);
+      return timer as unknown as ReturnType<typeof setTimeout>;
+    },
+    clearTimeout: (timer) => {
+      timers.delete(timer as unknown as number);
+    },
+  };
+
+  return {
+    timing,
+    advanceTo: (milliseconds: number) => {
+      now = milliseconds;
+    },
+    timerCount: () => timers.size,
+  };
 };
 
 const clientWithRunPages = (...pagesByCall: WorkflowRunPages[]) => {
@@ -509,6 +535,48 @@ describe('github', () => {
         await advanceUntilCalled(settled);
         await request.catch(() => undefined);
       }
+    });
+
+    it('does not start another pagination page after the monotonic deadline', async () => {
+      const fake = manualTiming();
+      const deadline = new ActionDeadline({ mode: 'abort', seconds: 1 }, fake.timing);
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementationOnce(async () => {
+          fake.advanceTo(1_000);
+          return new Response(
+            JSON.stringify({ total_count: 2, workflows: [{ id: 1, name: 'First' }] }),
+            {
+              status: 200,
+              headers: {
+                'content-type': 'application/json',
+                link: '<https://api.github.com/repos/org/repo/actions/workflows?page=2>; rel="next"',
+              },
+            },
+          );
+        })
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ total_count: 2, workflows: [{ id: 2, name: 'Second' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      const requestOptions = {
+        signal: deadline.signal,
+        checkDeadline: deadline.throwIfReached,
+      } as GitHubRequestOptions;
+      const request = new OctokitGitHub('fake-token').workflows('org', 'repo', requestOptions);
+
+      try {
+        await expect(request).rejects.toEqual(new DeadlineReached('abort', 1));
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(deadline.signal.aborted).toBe(true);
+      } finally {
+        deadline.dispose();
+        await request.catch(() => undefined);
+      }
+
+      expect(fake.timerCount()).toBe(0);
     });
 
     it.each([

@@ -1,7 +1,7 @@
 import { setOutput } from '@actions/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ActionDeadline, systemDeadlineTiming } from '../../src/deadline';
+import { ActionDeadline, systemDeadlineTiming, type DeadlineTiming } from '../../src/deadline';
 import type { WorkflowJob, WorkflowRun, WorkflowStep } from '../../src/github';
 import type { Input } from '../../src/input';
 import { retryRequest } from '../../src/retry';
@@ -73,6 +73,31 @@ const deferredPromise = <T>() => {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+};
+
+const manualTiming = () => {
+  let now = 0;
+  let nextTimer = 1;
+  const timers = new Map<number, () => void>();
+  const timing: DeadlineTiming = {
+    now: () => now,
+    setTimeout: (callback) => {
+      const timer = nextTimer++;
+      timers.set(timer, callback);
+      return timer as unknown as ReturnType<typeof setTimeout>;
+    },
+    clearTimeout: (timer) => {
+      timers.delete(timer as unknown as number);
+    },
+  };
+
+  return {
+    timing,
+    advanceTo: (milliseconds: number) => {
+      now = milliseconds;
+    },
+    timerCount: () => timers.size,
+  };
 };
 
 const client = (overrides: Partial<WaiterGitHubClient> = {}): WaiterGitHubClient => ({
@@ -237,6 +262,38 @@ describe('wait deadlines', () => {
 
     expect(settled).toHaveBeenCalledWith('rejected', expect.any(Error));
     await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+  });
+
+  it('does not start a follow-up discovery read after the monotonic deadline', async () => {
+    const fake = manualTiming();
+    const waiterInput = input({ abortAfterSeconds: 1 });
+    const deadline = ActionDeadline.fromInput(waiterInput, fake.timing);
+    const runs = vi.fn().mockResolvedValue([]);
+    const run = vi.fn().mockImplementation(async () => {
+      fake.advanceTo(1_000);
+      return workflowRun({ id: waiterInput.runId });
+    });
+    const waitPromise = new Waiter(
+      workflowId,
+      client({ run, runs }),
+      waiterInput,
+      vi.fn(),
+      vi.fn(),
+      fake.timing,
+      deadline,
+    ).wait();
+
+    try {
+      await expect(waitPromise).rejects.toThrow('Aborted after waiting 1 seconds');
+      expect(run).toHaveBeenCalledOnce();
+      expect(runs).not.toHaveBeenCalled();
+      expect(deadline.signal.aborted).toBe(true);
+    } finally {
+      deadline.dispose();
+      await waitPromise.catch(() => undefined);
+    }
+
+    expect(fake.timerCount()).toBe(0);
   });
 
   it.each([

@@ -1290,13 +1290,19 @@ describe('wait', () => {
             'repo',
             workflow1.id,
             { branch: undefined },
-            { signal: expect.any(AbortSignal) },
+            {
+              checkDeadline: expect.any(Function),
+              signal: expect.any(AbortSignal),
+            },
           );
           expect(activeRunsForRepo).toHaveBeenCalledWith(
             'org',
             'repo',
             { branch: undefined },
-            { signal: expect.any(AbortSignal) },
+            {
+              checkDeadline: expect.any(Function),
+              signal: expect.any(AbortSignal),
+            },
           );
 
           const hasSearchMessage = debugMessages.some((msg) =>
@@ -1469,7 +1475,10 @@ describe('wait', () => {
             'repo',
             workflow1.id,
             { branch: undefined },
-            { signal: expect.any(AbortSignal) },
+            {
+              checkDeadline: expect.any(Function),
+              signal: expect.any(AbortSignal),
+            },
           );
         });
 

@@ -52,18 +52,32 @@ export interface WorkflowRunFilters {
 
 export interface GitHubRequestOptions {
   signal?: AbortSignal;
+  checkDeadline?: () => void;
 }
 
-const bindRequestSignal = <T extends RequestInterface>(
+const presentRequestOptions = (
+  requestOptions: GitHubRequestOptions,
+): GitHubRequestOptions | undefined => {
+  const options: GitHubRequestOptions = {
+    ...(requestOptions.signal ? { signal: requestOptions.signal } : {}),
+    ...(requestOptions.checkDeadline ? { checkDeadline: requestOptions.checkDeadline } : {}),
+  };
+  return options.signal || options.checkDeadline ? options : undefined;
+};
+
+const bindRequestOptions = <T extends RequestInterface>(
   request: T,
-  signal: AbortSignal | undefined,
-): T =>
+  requestOptions: GitHubRequestOptions,
+): T => {
+  const options = presentRequestOptions(requestOptions);
   // The pagination plugin reconstructs each page request from method, URL,
-  // and headers. Binding the signal into the method defaults keeps it present
-  // when those reduced page options pass through the request and retry hooks.
+  // and headers. Binding lifecycle options into the method defaults keeps the
+  // signal and monotonic checkpoint present when those reduced page options
+  // pass through the request and retry hooks.
   // `.defaults()` preserves the endpoint's request and response contract, but
   // its public return type does not retain the endpoint method's subtype.
-  (signal ? request.defaults({ request: { signal } }) : request) as T;
+  return (options ? request.defaults({ request: options }) : request) as T;
+};
 
 const matchesWorkflowRunFilters = (run: WorkflowRun, filters: WorkflowRunFilters) => {
   if (!ACTIVE_RUN_STATUS_SET.has(run.status || '')) {
@@ -119,13 +133,14 @@ export class OctokitGitHub {
         retries,
         options.request.signal,
         (delaySeconds) => warning(`Retrying after ${delaySeconds} seconds!`),
+        options.request.checkDeadline,
       );
     });
   }
 
   workflows = async (owner: string, repo: string, requestOptions: GitHubRequestOptions = {}) =>
     this.octokit.paginate(
-      bindRequestSignal(this.octokit.actions.listRepoWorkflows, requestOptions.signal),
+      bindRequestOptions(this.octokit.actions.listRepoWorkflows, requestOptions),
       {
         owner,
         repo,
@@ -139,11 +154,12 @@ export class OctokitGitHub {
     run_id: number,
     requestOptions: GitHubRequestOptions = {},
   ): Promise<WorkflowRun> => {
+    const lifecycleOptions = presentRequestOptions(requestOptions);
     const { data } = await this.octokit.actions.getWorkflowRun({
       owner,
       repo,
       run_id,
-      ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
+      ...(lifecycleOptions ? { request: lifecycleOptions } : {}),
     });
     return data as WorkflowRun;
   };
@@ -170,7 +186,7 @@ export class OctokitGitHub {
       ACTIVE_RUN_STATUSES.map(async (status) => {
         let pagesScanned = 0;
         const runs = await paginateWorkflowRuns(
-          bindRequestSignal(listRuns, requestOptions.signal),
+          bindRequestOptions(listRuns, requestOptions),
           {
             ...baseOptions,
             ...(filters.branch ? { branch: filters.branch } : {}),
@@ -257,7 +273,7 @@ export class OctokitGitHub {
       };
 
     return this.octokit.paginate(
-      bindRequestSignal(this.octokit.actions.listJobsForWorkflowRun, requestOptions.signal),
+      bindRequestOptions(this.octokit.actions.listJobsForWorkflowRun, requestOptions),
       options,
     );
   };
@@ -268,11 +284,12 @@ export class OctokitGitHub {
     job_id: number,
     requestOptions: GitHubRequestOptions = {},
   ) => {
+    const lifecycleOptions = presentRequestOptions(requestOptions);
     const options: Endpoints['GET /repos/{owner}/{repo}/actions/jobs/{job_id}']['parameters'] = {
       owner,
       repo,
       job_id,
-      ...(requestOptions.signal ? { request: { signal: requestOptions.signal } } : {}),
+      ...(lifecycleOptions ? { request: lifecycleOptions } : {}),
     };
     const { data: job } = await this.octokit.actions.getJobForWorkflowRun(options);
     return job.steps || [];

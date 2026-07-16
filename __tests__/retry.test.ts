@@ -1,11 +1,37 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { ActionDeadline, DeadlineReached, type DeadlineTiming } from '../src/deadline';
 import { retryRequest } from '../src/retry';
 
 const flushMicrotasks = async () => {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await Promise.resolve();
   }
+};
+
+const manualTiming = () => {
+  let now = 0;
+  let nextTimer = 1;
+  const timers = new Map<number, () => void>();
+  const timing: DeadlineTiming = {
+    now: () => now,
+    setTimeout: (callback) => {
+      const timer = nextTimer++;
+      timers.set(timer, callback);
+      return timer as unknown as ReturnType<typeof setTimeout>;
+    },
+    clearTimeout: (timer) => {
+      timers.delete(timer as unknown as number);
+    },
+  };
+
+  return {
+    timing,
+    advanceTo: (milliseconds: number) => {
+      now = milliseconds;
+    },
+    timerCount: () => timers.size,
+  };
 };
 
 const primaryRateLimitError = (resetAtSeconds?: string) =>
@@ -89,6 +115,36 @@ describe('abortable retry scheduling', () => {
     await expect(result).rejects.toBe(controller.signal.reason);
 
     expect(operation).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not start a retry after the monotonic deadline when timer delivery is delayed', async () => {
+    vi.useFakeTimers();
+    const fake = manualTiming();
+    const deadline = new ActionDeadline({ mode: 'abort', seconds: 1 }, fake.timing);
+    const error = Object.assign(new Error('server error'), { status: 500 });
+    const operation = vi.fn().mockImplementation(async () => {
+      fake.advanceTo(1_000);
+      throw error;
+    });
+    const result = retryRequest(operation, 1, deadline.signal, undefined, deadline.throwIfReached);
+    const rejection = result.then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+
+    try {
+      await vi.runAllTimersAsync();
+      await expect(rejection).resolves.toEqual(new DeadlineReached('abort', 1));
+      expect(operation).toHaveBeenCalledOnce();
+      expect(deadline.signal.aborted).toBe(true);
+    } finally {
+      deadline.cancel();
+      deadline.dispose();
+      await result.catch(() => undefined);
+    }
+
+    expect(fake.timerCount()).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
   });
 

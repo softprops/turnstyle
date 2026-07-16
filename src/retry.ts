@@ -70,15 +70,21 @@ export const retryRequest = async <T>(
   serverErrorRetries: number,
   signal?: AbortSignal,
   onPrimaryRateLimitRetry?: (delaySeconds: number) => void,
+  checkDeadline?: () => void,
 ): Promise<T> => {
   let requestAttemptCount = 0;
   let serverErrorRetryCount = 0;
   let primaryRateLimitRetryCount = 0;
   while (true) {
+    checkDeadline?.();
     signal?.throwIfAborted();
+    let value: T;
     try {
-      return await operation(requestAttemptCount);
+      value = await operation(requestAttemptCount);
     } catch (error: unknown) {
+      // A delayed deadline timer must not allow a completed request to start
+      // another backoff or retry after the monotonic boundary.
+      checkDeadline?.();
       signal?.throwIfAborted();
       const status = errorStatus(error);
       const primaryRateLimitDelay = primaryRateLimitDelaySeconds(error);
@@ -99,6 +105,13 @@ export const retryRequest = async <T>(
 
       requestAttemptCount += 1;
       await waitForRetry(retryDelay, signal);
+      continue;
     }
+
+    // Pagination may use this response to issue another request. Check before
+    // returning it to Octokit so a late timer callback cannot start that page.
+    checkDeadline?.();
+    signal?.throwIfAborted();
+    return value;
   }
 };

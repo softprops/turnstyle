@@ -59,6 +59,7 @@ describe('main', () => {
 
     expect(githubFactory).toHaveBeenCalledWith('secret', 2);
     expect(workflows).toHaveBeenCalledWith('softprops', 'turnstyle', {
+      checkDeadline: expect.any(Function),
       signal: expect.any(AbortSignal),
     });
     expect(waiterFactory).toHaveBeenCalledWith(

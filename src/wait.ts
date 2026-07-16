@@ -190,13 +190,15 @@ export class Waiter implements Wait {
     }
   };
 
-  private withDeadline = async <T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+  private withDeadline = async <T>(
+    operation: (requestOptions: GitHubRequestOptions) => Promise<T>,
+  ): Promise<T> => {
     const deadline = this.deadline;
     if (!deadline) {
       throw new Error('Wait deadline has not been initialized');
     }
 
-    return deadline.race(operation);
+    return deadline.race((signal) => operation({ signal, checkDeadline: deadline.throwIfReached }));
   };
 
   private discoverRuns = async (): Promise<{
@@ -205,65 +207,62 @@ export class Waiter implements Wait {
   }> => {
     this.debug(`Fetching workflow runs for workflow ID: ${this.workflowId}`);
     const queueName = this.input.queueName;
-    return this.withDeadline(async (signal) => {
-      const requestOptions = { signal };
-      let currentRun: WorkflowRun | undefined;
-      try {
-        currentRun = await this.githubClient.run(
-          this.input.owner,
-          this.input.repo,
-          this.input.runId,
-          requestOptions,
-        );
-      } catch (error: unknown) {
-        signal.throwIfAborted();
-        this.debug(`Failed to fetch current run ${this.input.runId}: ${errorMessage(error)}`);
-      }
-      signal.throwIfAborted();
+    let currentRun: WorkflowRun | undefined;
+    try {
+      currentRun = await this.withDeadline((requestOptions) =>
+        this.githubClient.run(this.input.owner, this.input.repo, this.input.runId, requestOptions),
+      );
+    } catch (error: unknown) {
+      this.deadline?.throwIfReached();
+      this.deadline?.signal.throwIfAborted();
+      this.debug(`Failed to fetch current run ${this.input.runId}: ${errorMessage(error)}`);
+    }
 
-      const runFilters = {
-        branch: this.input.sameBranchOnly ? this.input.branch : undefined,
-      };
-      const runs = await this.githubClient.runs(
+    const runFilters = {
+      branch: this.input.sameBranchOnly ? this.input.branch : undefined,
+    };
+    const runs = await this.withDeadline((requestOptions) =>
+      this.githubClient.runs(
         this.input.owner,
         this.input.repo,
         this.workflowId,
         runFilters,
         requestOptions,
-      );
+      ),
+    );
 
-      this.debug(`Found ${runs.length} ${this.workflowId} runs`);
+    this.debug(`Found ${runs.length} ${this.workflowId} runs`);
 
-      currentRun = currentRun || findCurrentRun(runs, this.input);
-      let filteredRuns = filterEligibleRuns(runs, this.input);
+    currentRun = currentRun || findCurrentRun(runs, this.input);
+    let filteredRuns = filterEligibleRuns(runs, this.input);
 
-      if (queueName) {
-        this.debug(`Searching active workflow runs across repository for queue name: ${queueName}`);
-        signal.throwIfAborted();
-        const queueRuns = await this.githubClient.activeRunsForRepo(
+    if (queueName) {
+      this.debug(`Searching active workflow runs across repository for queue name: ${queueName}`);
+      const queueRuns = await this.withDeadline((requestOptions) =>
+        this.githubClient.activeRunsForRepo(
           this.input.owner,
           this.input.repo,
           runFilters,
           requestOptions,
-        );
+        ),
+      );
 
-        currentRun = currentRun || findCurrentRun(queueRuns, this.input);
-        filteredRuns = filterEligibleRuns(queueRuns, this.input).filter((run) => {
-          const matchesQueue =
-            run.display_title?.includes(queueName) || run.name?.includes(queueName);
-          if (matchesQueue) {
-            this.debug(
-              `Run ${run.id} (${run.display_title || run.name}) matches queue: "${queueName}"`,
-            );
-          }
-          return matchesQueue;
-        });
+      currentRun = currentRun || findCurrentRun(queueRuns, this.input);
+      filteredRuns = filterEligibleRuns(queueRuns, this.input).filter((run) => {
+        const matchesQueue =
+          run.display_title?.includes(queueName) || run.name?.includes(queueName);
+        if (matchesQueue) {
+          this.debug(
+            `Run ${run.id} (${run.display_title || run.name}) matches queue: "${queueName}"`,
+          );
+        }
+        return matchesQueue;
+      });
 
-        this.debug(`After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`);
-      }
+      this.debug(`After queue filtering: ${filteredRuns.length} runs match queue "${queueName}"`);
+    }
 
-      return { currentRun, filteredRuns };
-    });
+    return { currentRun, filteredRuns };
   };
 
   private waitForCompletion = async (): Promise<void> => {
@@ -329,17 +328,20 @@ export class Waiter implements Wait {
         let shouldPoll = false;
         for (const previousRun of previousRuns) {
           this.debug(`Fetching jobs for run ${previousRun.id}`);
-          const jobs = await this.withDeadline((signal) =>
-            this.githubClient.jobs(this.input.owner, this.input.repo, previousRun.id, {
-              signal,
-            }),
+          const jobs = await this.withDeadline((requestOptions) =>
+            this.githubClient.jobs(
+              this.input.owner,
+              this.input.repo,
+              previousRun.id,
+              requestOptions,
+            ),
           );
           const job = jobs.find((job) => job.name === this.input.jobToWaitFor);
           // Now handle if we are checking for a specific step
           if (this.input.stepToWaitFor && job) {
             this.debug(`Fetching steps for job ${job.id}`);
-            const steps = await this.withDeadline((signal) =>
-              this.githubClient.steps(this.input.owner, this.input.repo, job.id, { signal }),
+            const steps = await this.withDeadline((requestOptions) =>
+              this.githubClient.steps(this.input.owner, this.input.repo, job.id, requestOptions),
             );
             const step = steps.find((step) => step.name === this.input.stepToWaitFor);
             if (step && step.status !== 'completed') {

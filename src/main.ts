@@ -1,7 +1,7 @@
 import { debug, info, setFailed, setOutput } from '@actions/core';
 import { env } from 'process';
 import { ActionDeadline, DeadlineReached, handleDeadline } from './deadline';
-import { OctokitGitHub } from './github';
+import { OctokitGitHub, type GitHubRequestOptions } from './github';
 import { parseInput, type Input } from './input';
 import { Waiter, type Wait, type WaiterGitHubClient } from './wait';
 import { findWorkflowId, type Workflow } from './workflow';
@@ -10,7 +10,7 @@ export interface ActionGitHubClient extends WaiterGitHubClient {
   workflows(
     owner: string,
     repo: string,
-    requestOptions?: { signal?: AbortSignal },
+    requestOptions?: GitHubRequestOptions,
   ): Promise<Workflow[]>;
 }
 
@@ -40,28 +40,32 @@ export async function run(
   let deadline: ActionDeadline | undefined;
   try {
     const input = parseInput(environment);
-    deadline = deadlineFactory(input);
+    const actionDeadline = deadlineFactory(input);
+    deadline = actionDeadline;
     debug(
       `Parsed inputs (w/o token): ${(({ githubToken, ...inputs }) => JSON.stringify(inputs))(
         input,
       )}`,
     );
-    deadline.throwIfReached();
+    actionDeadline.throwIfReached();
     const github = githubFactory(input.githubToken, input.retries);
     debug(`Fetching workflows for ${input.owner}/${input.repo}...`);
-    const workflows = await deadline.race((signal) =>
-      github.workflows(input.owner, input.repo, { signal }),
+    const workflows = await actionDeadline.race((signal) =>
+      github.workflows(input.owner, input.repo, {
+        signal,
+        checkDeadline: actionDeadline.throwIfReached,
+      }),
     );
     debug(`Found ${workflows.length} workflows in ${input.owner}/${input.repo}`);
-    deadline.throwIfReached();
+    actionDeadline.throwIfReached();
     const workflowId = findWorkflowId(workflows, input);
     if (workflowId !== undefined) {
-      const result = await waiterFactory(workflowId, github, input, deadline).wait();
+      const result = await waiterFactory(workflowId, github, input, actionDeadline).wait();
       if (result === undefined) {
-        deadline.throwIfReached();
+        actionDeadline.throwIfReached();
       }
     } else {
-      deadline.throwIfReached();
+      actionDeadline.throwIfReached();
       setFailed(
         `No workflow found matching workflow path or name: ${input.workflowPath || input.workflowName}`,
       );
