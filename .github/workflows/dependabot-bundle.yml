@@ -1,0 +1,60 @@
+name: Update Dependabot bundle
+
+on:
+  # PR code runs only in read-only CI; this job reads the bundle as data and
+  # validates the live PR and expected head before committing one fixed path.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [main]
+    types: [completed]
+    branches: ["dependabot/npm_and_yarn/**"]
+
+permissions: {}
+
+concurrency:
+  group: dependabot-bundle-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  update-bundle:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: read
+    steps:
+      # Only trusted default-branch code runs in this job. The artifact is data.
+      - name: Checkout automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate pull request and artifact
+        id: validate
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { validate } = require('./.github/scripts/dependabot-bundle.cjs');
+            const pr = await validate(github, context);
+            core.setOutput('eligible', Boolean(pr));
+
+      - name: Download bundle
+        if: steps.validate.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          gh run download "$RUN_ID" --name "dependabot-bundle-$HEAD_SHA" --dir "$RUNNER_TEMP/dependabot-bundle"
+
+      - name: Commit bundle and run CI
+        if: steps.validate.outputs.eligible == 'true'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { update } = require('./.github/scripts/dependabot-bundle.cjs');
+            await update(github, context);
