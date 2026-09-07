@@ -22,6 +22,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Build the exact head that the bundle updater will commit onto.
+          ref: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
@@ -34,12 +38,28 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
-      - name: Check bundled action
-        run: git diff --exit-code -- dist/index.js
       - name: Test
         run: npm run test
+      - name: Test bundle automation
+        run: node --test .github/scripts/dependabot-bundle.test.cjs
       - name: Format
         run: npm run fmtcheck
+
+      - name: Upload Dependabot bundle
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.login == 'dependabot[bot]' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          startsWith(github.head_ref, 'dependabot/npm_and_yarn/')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependabot-bundle-${{ github.event.pull_request.head.sha }}
+          path: dist/index.js
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+      - name: Check bundled action
+        run: git diff --exit-code -- dist/index.js
 
   integration:
     if: github.event_name == 'push'

@@ -1,5 +1,6 @@
 version: 2
 updates:
+  # dependabot-bundle.yml commits rebuilt dist/index.js after npm PR checks.
   - package-ecosystem: npm
     directory: "/"
     schedule:
