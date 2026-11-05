@@ -1,0 +1,18 @@
+__tests__/github.test.ts
+  h_9df9c32c3f321d 34-36,729-920,938-945,949,958,971,998-1100
+dist/index.js
+  h_9df9c32c3f321d 1-5,14,16,22,27,29,40-41,45-46,56,58
+src/github.ts
+  h_9df9c32c3f321d 15,213-238
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "33e7c38b0773e8876aa5966c28301578d313aa06",
+  "prompts": {},
+  "humans": {
+    "h_9df9c32c3f321d": {
+      "author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
