@@ -1,0 +1,20 @@
+CHANGELOG.md
+  h_9df9c32c3f321d 1-4
+dist/index.js
+  h_9df9c32c3f321d 1-7,9-11,13-14,16,18,20-22,26-27,29,34,40-41,45-46,56,58
+package-lock.json
+  h_9df9c32c3f321d 3,9,2381-2383
+package.json
+  h_9df9c32c3f321d 3,46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f05c005f35139726c884d3a9664118e8dfefc6aa",
+  "prompts": {},
+  "humans": {
+    "h_9df9c32c3f321d": {
+      "author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
