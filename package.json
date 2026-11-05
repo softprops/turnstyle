@@ -33,12 +33,12 @@
     "@octokit/rest": "^22.0.1"
   },
   "devDependencies": {
-    "@types/node": "^24.13.6",
-    "@vitest/coverage-v8": "^5.0.1",
+    "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "^5.0.5",
     "esbuild": "^0.28.2",
     "husky": "^9.1.7",
-    "lint-staged": "^17.5.1",
-    "prettier": "^3.9.9",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.10",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   },
