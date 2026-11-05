@@ -12,6 +12,7 @@ import { retryRequest } from './retry';
 
 const ThrottledOctokit = Octokit.plugin(throttling, retry);
 const MAX_WORKFLOW_RUN_PAGES = 50;
+const MAX_UNFILTERED_RUN_PAGES = 5;
 const ACTIVE_RUN_STATUSES = ['in_progress', 'queued', 'waiting'] as const;
 const ACTIVE_RUN_STATUS_SET = new Set<string>(ACTIVE_RUN_STATUSES);
 type ThrottleRequestOptions = Pick<Required<EndpointDefaults>, 'method' | 'url'>;
@@ -208,6 +209,32 @@ export class OctokitGitHub {
           runsById.set(run.id, run);
         }
       }),
+    );
+
+    // GitHub's status (and branch) indexes can omit active runs. Always
+    // reconcile a small, unfiltered recent window, even if an index returned
+    // some candidates. Keep the separate active scans for older runs without
+    // walking the repository's entire completed history (issues #165 / #146).
+    let recentPagesScanned = 0;
+    await paginateWorkflowRuns(
+      bindRequestOptions(listRuns, requestOptions),
+      baseOptions,
+      (response, done) => {
+        for (const run of response.data) {
+          // The unfiltered snapshot also removes stale indexed candidates
+          // that have since completed, changed branch, or left the queue.
+          if (matchesWorkflowRunFilters(run, filters)) {
+            runsById.set(run.id, run);
+          } else {
+            runsById.delete(run.id);
+          }
+        }
+        recentPagesScanned += 1;
+        if (recentPagesScanned >= MAX_UNFILTERED_RUN_PAGES) {
+          done();
+        }
+        return [];
+      },
     );
     return [...runsById.values()];
   };
