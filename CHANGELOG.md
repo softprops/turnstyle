@@ -1,3 +1,11 @@
+## 3.3.5 (2026-11-05)
+
+### Bug fixes
+
+- Restore waiting for active predecessor runs when GitHub's status-filtered workflow-run lists are stale, for both workflow-specific discovery and repository-wide `queue-name` discovery. Fixes #165 via #170.
+- Reconcile up to five unfiltered pages (500 recent runs) client-side while preserving branch/queue filtering, bounded active-status queries for older runs, and deadline cancellation. Keep repository-level queue discovery without per-workflow fanout, avoiding the request explosion reported in #146.
+- Remove stale indexed active candidates when the recent unfiltered response shows they have completed.
+
 ## 3.3.4
 
 maintenance release with updated dependencies
