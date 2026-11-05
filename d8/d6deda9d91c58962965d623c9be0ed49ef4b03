@@ -1,0 +1,14 @@
+package-lock.json
+  h_9df9c32c3f321d 2382
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d8d6deda9d91c58962965d623c9be0ed49ef4b03",
+  "prompts": {},
+  "humans": {
+    "h_9df9c32c3f321d": {
+      "author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
