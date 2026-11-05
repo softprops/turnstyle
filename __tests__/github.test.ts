@@ -8,10 +8,13 @@ import {
   type GitHubRequestOptions,
   type WorkflowRun,
 } from '../src/github';
+import { parseInput } from '../src/input';
+import { Waiter } from '../src/wait';
 
 vi.mock('@actions/core', () => ({
   debug: vi.fn(),
   warning: vi.fn(),
+  setOutput: vi.fn(),
 }));
 
 const run = (overrides: Partial<WorkflowRun>): WorkflowRun =>
@@ -178,8 +181,8 @@ const clientWithDynamicRunPages = (
 
   replaceOctokit(client, {
     actions: {
-      listWorkflowRuns: vi.fn(),
-      listWorkflowRunsForRepo: vi.fn(),
+      listWorkflowRuns: mockRequestMethod().request,
+      listWorkflowRunsForRepo: mockRequestMethod().request,
     },
     paginate,
   });
@@ -720,6 +723,76 @@ describe('github', () => {
   });
 
   describe('runs', () => {
+    it.each(['workflow', 'repository'] as const)(
+      'discovers an active predecessor with stale status indexes (%s, issue #165)',
+      async (scope) => {
+        const predecessor = run({ id: 1, status: 'in_progress', conclusion: null });
+        const { client } = clientWithDynamicRunPages((options) =>
+          options.status ? [[]] : [[predecessor]],
+        );
+
+        const runs =
+          scope === 'workflow'
+            ? await client.runs('org', 'repo', 123)
+            : await client.activeRunsForRepo('org', 'repo');
+
+        expect(runs).toEqual([predecessor]);
+      },
+    );
+
+    it.each([undefined, 'deploy'] as const)(
+      'waits for the unfiltered predecessor to complete with stale status indexes (queue %s, issue #165)',
+      async (queueName) => {
+        vi.useFakeTimers();
+        let completed = false;
+        const predecessor = run({
+          id: 1,
+          status: 'in_progress',
+          conclusion: null,
+          name: 'deploy',
+        });
+        const current = run({
+          id: 2,
+          status: 'in_progress',
+          conclusion: null,
+          run_started_at: '2026-05-03T10:05:00Z',
+        });
+        const { client } = clientWithDynamicRunPages((options) =>
+          options.status
+            ? [[]]
+            : [[current, { ...predecessor, status: completed ? 'completed' : 'in_progress' }]],
+        );
+        vi.spyOn(client, 'run').mockResolvedValue(current);
+        const input = {
+          ...parseInput({
+            GITHUB_REPOSITORY: 'org/repo',
+            GITHUB_RUN_ID: '2',
+            'INPUT_SAME-BRANCH-ONLY': 'false',
+            'INPUT_POLL-INTERVAL-SECONDS': '1',
+          }),
+          queueName,
+        };
+        const info = vi.fn();
+        const settled = vi.fn();
+        const waiting = new Waiter(123, client, input, info, vi.fn()).wait();
+        void waiting.then(settled, settled);
+
+        try {
+          await flushMicrotasks();
+          expect(info).toHaveBeenCalledWith('✋Awaiting run https://example.com/run ...');
+          expect(settled).not.toHaveBeenCalled();
+          completed = true;
+          await vi.advanceTimersByTimeAsync(1000);
+          await waiting;
+          expect(settled).toHaveBeenCalledOnce();
+        } finally {
+          completed = true;
+          await vi.runAllTimersAsync();
+          await waiting;
+        }
+      },
+    );
+
     it('de-duplicates the same active run returned by multiple status queries', async () => {
       const duplicateRun = run({ id: 7, status: 'queued', conclusion: null });
       const { client } = clientWithRunPages([[duplicateRun]], [[duplicateRun]], []);
