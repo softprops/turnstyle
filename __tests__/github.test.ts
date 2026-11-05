@@ -31,6 +31,9 @@ const run = (overrides: Partial<WorkflowRun>): WorkflowRun =>
     ...overrides,
   }) as WorkflowRun;
 
+const jsonResponse = (url: URL, data: unknown, init: ResponseInit): Response =>
+  Object.defineProperty(new Response(JSON.stringify(data), init), 'url', { value: url.href });
+
 type WorkflowRunPages = WorkflowRun[][];
 type PageMapper = (response: { data: WorkflowRun[] }, done: () => void) => WorkflowRun[];
 interface TestOctokit {
@@ -724,6 +727,198 @@ describe('github', () => {
 
   describe('runs', () => {
     it.each(['workflow', 'repository'] as const)(
+      'limits stale-index recovery to five HTTP pages in a busy history (%s)',
+      async (scope) => {
+        const predecessor = run({ id: 1, status: 'in_progress', conclusion: null });
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+          const url = new URL(input instanceof Request ? input.url : String(input));
+          const page = Number(url.searchParams.get('page') || 1);
+          const filtered = url.searchParams.has('status');
+          const runs = filtered
+            ? []
+            : Array.from({ length: 100 }, (_, index) => run({ id: 1000 - page * 100 - index }));
+          if (!filtered && page === 5) {
+            runs[99] = predecessor;
+          }
+          url.searchParams.set('page', String(page + 1));
+          return jsonResponse(
+            url,
+            { total_count: 10000, workflow_runs: runs },
+            {
+              headers: {
+                'content-type': 'application/json',
+                ...(!filtered ? { link: `<${url}>; rel="next"` } : {}),
+              },
+            },
+          );
+        });
+        const client = new OctokitGitHub('fake-token');
+
+        const runs =
+          scope === 'workflow'
+            ? await client.runs('org', 'repo', 123)
+            : await client.activeRunsForRepo('org', 'repo');
+
+        expect(runs).toEqual([predecessor]);
+        expect(fetchMock).toHaveBeenCalledTimes(8);
+        const urls = fetchMock.mock.calls.map(
+          ([input]) => new URL(input instanceof Request ? input.url : String(input)),
+        );
+        expect(urls.filter((url) => !url.searchParams.has('status'))).toHaveLength(5);
+        expect(urls.every((url) => !url.searchParams.has('branch'))).toBe(true);
+        expect(
+          urls.every(
+            (url) =>
+              url.pathname ===
+              (scope === 'workflow'
+                ? '/repos/org/repo/actions/workflows/123/runs'
+                : '/repos/org/repo/actions/runs'),
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it.each(['workflow', 'repository'] as const)(
+      'checks the deadline before another unfiltered page (%s)',
+      async (scope) => {
+        const fake = manualTiming();
+        const deadline = new ActionDeadline({ mode: 'abort', seconds: 1 }, fake.timing);
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+          const url = new URL(input instanceof Request ? input.url : String(input));
+          if (!url.searchParams.has('status')) {
+            fake.advanceTo(1000);
+            url.searchParams.set('page', '2');
+          }
+          return jsonResponse(
+            url,
+            { total_count: 100, workflow_runs: [run({})] },
+            {
+              headers: {
+                'content-type': 'application/json',
+                ...(!url.searchParams.has('status') ? { link: `<${url}>; rel="next"` } : {}),
+              },
+            },
+          );
+        });
+        const client = new OctokitGitHub('fake-token');
+        const options = { signal: deadline.signal, checkDeadline: deadline.throwIfReached };
+        const request =
+          scope === 'workflow'
+            ? client.runs('org', 'repo', 123, {}, options)
+            : client.activeRunsForRepo('org', 'repo', {}, options);
+
+        try {
+          await expect(request).rejects.toEqual(new DeadlineReached('abort', 1));
+          expect(fetchMock).toHaveBeenCalledTimes(4);
+          expect(deadline.signal.aborted).toBe(true);
+        } finally {
+          deadline.dispose();
+        }
+        expect(fake.timerCount()).toBe(0);
+      },
+    );
+
+    it.each(['workflow', 'repository'] as const)(
+      'cancels a pending unfiltered pagination page (%s)',
+      async (scope) => {
+        vi.useFakeTimers();
+        const controller = new AbortController();
+        const fetchMock = vi
+          .spyOn(globalThis, 'fetch')
+          .mockImplementation(async (input, options) => {
+            const url = new URL(input instanceof Request ? input.url : String(input));
+            if (url.searchParams.get('page') === '2') {
+              return new Promise<Response>((_resolve, reject) => {
+                options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), {
+                  once: true,
+                });
+              });
+            }
+            const filtered = url.searchParams.has('status');
+            url.searchParams.set('page', '2');
+            return jsonResponse(
+              url,
+              { total_count: 2, workflow_runs: filtered ? [] : [run({})] },
+              {
+                headers: {
+                  'content-type': 'application/json',
+                  ...(!filtered ? { link: `<${url}>; rel="next"` } : {}),
+                },
+              },
+            );
+          });
+        const client = new OctokitGitHub('fake-token');
+        const options = { signal: controller.signal };
+        const request =
+          scope === 'workflow'
+            ? client.runs('org', 'repo', 123, {}, options)
+            : client.activeRunsForRepo('org', 'repo', {}, options);
+        const settled = vi.fn();
+        void request.then(settled, settled);
+
+        await advanceUntilCallCount(fetchMock, 5);
+        expect(fetchMock).toHaveBeenCalledTimes(5);
+        expect(fetchMock.mock.calls[4][1]?.signal).toBe(controller.signal);
+        controller.abort();
+        await flushShortDelayWorkUntilCalled(settled);
+        await expect(request).rejects.toBe(controller.signal.reason);
+        await vi.runAllTimersAsync();
+        expect(settled).toHaveBeenCalledOnce();
+        expect(fetchMock).toHaveBeenCalledTimes(5);
+        expect(vi.getTimerCount()).toBe(0);
+      },
+    );
+
+    it('cancels an unfiltered 5xx retry at the action deadline', async () => {
+      vi.useFakeTimers();
+      const deadline = new ActionDeadline({ mode: 'abort', seconds: 1 });
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const url = new URL(input instanceof Request ? input.url : String(input));
+        return url.searchParams.has('status')
+          ? jsonResponse(
+              url,
+              { total_count: 0, workflow_runs: [] },
+              {
+                headers: { 'content-type': 'application/json' },
+              },
+            )
+          : jsonResponse(
+              url,
+              { message: 'server error' },
+              {
+                status: 500,
+                headers: { 'content-type': 'application/json' },
+              },
+            );
+      });
+      const request = deadline.race((signal) =>
+        new OctokitGitHub('fake-token', 3).runs(
+          'org',
+          'repo',
+          123,
+          {},
+          {
+            signal,
+            checkDeadline: deadline.throwIfReached,
+          },
+        ),
+      );
+      const assertion = expect(request).rejects.toEqual(new DeadlineReached('abort', 1));
+      try {
+        await advanceUntilCallCount(fetchMock, 4);
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+        await vi.advanceTimersByTimeAsync(1000);
+        await assertion;
+        await vi.runAllTimersAsync();
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+        expect(deadline.signal.aborted).toBe(true);
+      } finally {
+        deadline.dispose();
+      }
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it.each(['workflow', 'repository'] as const)(
       'discovers an active predecessor with stale status indexes (%s, issue #165)',
       async (scope) => {
         const predecessor = run({ id: 1, status: 'in_progress', conclusion: null });
@@ -740,13 +935,18 @@ describe('github', () => {
       },
     );
 
-    it.each([undefined, 'deploy'] as const)(
-      'waits for the unfiltered predecessor to complete with stale status indexes (queue %s, issue #165)',
-      async (queueName) => {
+    it.each([
+      { queueName: undefined, attempt: 1 },
+      { queueName: 'deploy', attempt: 1 },
+      { queueName: undefined, attempt: 2 },
+      { queueName: 'deploy', attempt: 2 },
+    ])(
+      'waits for the unfiltered predecessor to complete with stale status indexes ($queueName, attempt $attempt, issue #165)',
+      async ({ queueName, attempt }) => {
         vi.useFakeTimers();
         let completed = false;
         const predecessor = run({
-          id: 1,
+          id: attempt === 1 ? 1 : 3,
           status: 'in_progress',
           conclusion: null,
           name: 'deploy',
@@ -755,6 +955,7 @@ describe('github', () => {
           id: 2,
           status: 'in_progress',
           conclusion: null,
+          run_attempt: attempt,
           run_started_at: '2026-05-03T10:05:00Z',
         });
         const { client } = clientWithDynamicRunPages((options) =>
@@ -767,6 +968,7 @@ describe('github', () => {
           ...parseInput({
             GITHUB_REPOSITORY: 'org/repo',
             GITHUB_RUN_ID: '2',
+            GITHUB_RUN_ATTEMPT: String(attempt),
             'INPUT_SAME-BRANCH-ONLY': 'false',
             'INPUT_POLL-INTERVAL-SECONDS': '1',
           }),
@@ -790,6 +992,109 @@ describe('github', () => {
           await vi.runAllTimersAsync();
           await waiting;
         }
+      },
+    );
+
+    it.each([undefined, 'success', 'failure', 'cancelled'] as const)(
+      'exits normally for an absent or completed predecessor (%s)',
+      async (conclusion) => {
+        vi.useFakeTimers();
+        const current = run({ id: 2, status: 'in_progress', conclusion: null });
+        const previous = conclusion ? [run({ id: 1, status: 'completed', conclusion })] : [];
+        const { client } = clientWithDynamicRunPages((options) =>
+          options.status ? [[]] : [[current, ...previous]],
+        );
+        vi.spyOn(client, 'run').mockResolvedValue(current);
+        const info = vi.fn();
+        const input = parseInput({ GITHUB_REPOSITORY: 'org/repo', GITHUB_RUN_ID: '2' });
+
+        await expect(new Waiter(123, client, input, info, vi.fn()).wait()).resolves.toBeUndefined();
+
+        expect(info).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      },
+    );
+
+    it('reconciles recent runs even when the status index has other candidates', async () => {
+      const indexed = run({ id: 10, status: 'queued', conclusion: null });
+      const missing = run({ id: 11, status: 'in_progress', conclusion: null });
+      const { client } = clientWithDynamicRunPages((options) =>
+        options.status ? [[indexed]] : [[missing]],
+      );
+
+      await expect(client.runs('org', 'repo', 123)).resolves.toEqual([indexed, missing]);
+    });
+
+    it.each(['success', 'failure', 'cancelled'] as const)(
+      'does not retain an indexed active run now completed with %s',
+      async (conclusion) => {
+        const indexed = run({ id: 1, status: 'in_progress', conclusion: null });
+        const { client } = clientWithDynamicRunPages((options) =>
+          options.status ? [[indexed]] : [[{ ...indexed, status: 'completed', conclusion }]],
+        );
+
+        await expect(client.runs('org', 'repo', 123)).resolves.toEqual([]);
+      },
+    );
+
+    it.each([
+      [{}, [1, 2, 3, 4]],
+      [{ branch: 'master' }, [1, 2]],
+      [{ queueName: 'deploy' }, [1, 3]],
+      [{ branch: 'master', queueName: 'deploy' }, [1]],
+    ] as const)('filters unindexed runs client-side: %j', async (filters, expectedIds) => {
+      const recent = [
+        run({ id: 1, status: 'in_progress', conclusion: null, display_title: 'deploy' }),
+        run({ id: 2, status: 'queued', conclusion: null }),
+        run({
+          id: 3,
+          status: 'waiting',
+          conclusion: null,
+          head_branch: 'feature',
+          name: 'deploy',
+        }),
+        run({ id: 4, status: 'in_progress', conclusion: null, head_branch: null }),
+        ...(['success', 'failure', 'cancelled'] as const).map((conclusion, index) =>
+          run({ id: 5 + index, status: 'completed', conclusion, display_title: 'deploy' }),
+        ),
+        run({ id: 8, status: null, conclusion: null }),
+        run({ id: 9, status: 'cancelled', conclusion: 'cancelled' }),
+      ];
+      const { client } = clientWithDynamicRunPages((options) =>
+        options.status || options.branch ? [[]] : [recent],
+      );
+
+      const runs = await client.runs('org', 'repo', 123, filters);
+
+      expect(runs.map((run) => run.id)).toEqual(expectedIds);
+    });
+
+    it.each(['workflow', 'repository'] as const)(
+      'finds the 500th recent run and older indexed runs without walking completed history (%s)',
+      async (scope) => {
+        const recent = run({
+          id: 501,
+          status: 'in_progress',
+          conclusion: null,
+          display_title: 'deploy',
+        });
+        const older = run({ ...recent, id: 1 });
+        const historicalPages = Array.from({ length: 51 }, (_, page) =>
+          Array.from({ length: 100 }, (_, index) => run({ id: 1000 - page * 100 - index })),
+        );
+        historicalPages[4][99] = recent;
+        const { client, pagesScanned } = clientWithDynamicRunPages((options) =>
+          options.status === 'queued' ? [[older]] : options.status ? [[]] : historicalPages,
+        );
+
+        const filters = { branch: 'master', queueName: 'deploy' };
+        const runs =
+          scope === 'workflow'
+            ? await client.runs('org', 'repo', 123, filters)
+            : await client.activeRunsForRepo('org', 'repo', filters);
+
+        expect(runs).toEqual([older, recent]);
+        expect(pagesScanned()).toBe(8);
       },
     );
 
@@ -829,38 +1134,6 @@ describe('github', () => {
       await expect(client.runs('org', 'repo', 123, { queueName: 'deploy-api' })).resolves.toEqual([
         matchingRun,
       ]);
-    });
-
-    it('does not perform an unfiltered historical walk when only active runs can be eligible', async () => {
-      const completedHistoricalPages = Array.from({ length: 51 }, (_, pageIndex) =>
-        Array.from({ length: 100 }, (_, runIndex) =>
-          run({
-            id: pageIndex * 100 + runIndex + 1,
-            status: 'completed',
-            conclusion: 'success',
-          }),
-        ),
-      );
-      const activeRun = run({
-        id: 5101,
-        status: 'queued',
-        conclusion: null,
-        head_branch: 'master',
-      });
-      const { client, paginate, pagesScanned } = clientWithDynamicRunPages((options) => {
-        if (!options.status) {
-          return completedHistoricalPages;
-        }
-        return options.status === 'queued' ? [[activeRun]] : [];
-      });
-
-      await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
-        activeRun,
-      ]);
-      expect(paginate).toHaveBeenCalledTimes(ACTIVE_RUN_STATUSES.length);
-      expect(paginate.mock.calls.map(([, options]) => options.status)).toEqual(ACTIVE_RUN_STATUSES);
-      expect(paginate.mock.calls.every(([, options]) => options.branch === 'master')).toBe(true);
-      expect(pagesScanned()).toBe(1);
     });
 
     it('does not stop pagination after newer active runs outside the queue', async () => {
@@ -909,46 +1182,6 @@ describe('github', () => {
       ]);
     });
 
-    it('queries only active statuses with the branch filter', async () => {
-      const activeRun = run({
-        id: 1,
-        status: 'queued',
-        conclusion: null,
-        head_branch: 'master',
-      });
-      const { client, paginate } = clientWithRunPages([], [[activeRun]], []);
-
-      await expect(client.runs('org', 'repo', 123, { branch: 'master' })).resolves.toEqual([
-        activeRun,
-      ]);
-      expect(paginate.mock.calls.map(([, options]) => options)).toEqual([
-        expect.objectContaining({ branch: 'master', status: 'in_progress' }),
-        expect.objectContaining({ branch: 'master', status: 'queued' }),
-        expect.objectContaining({ branch: 'master', status: 'waiting' }),
-      ]);
-    });
-
-    it('keeps active status queries when no branch filter is provided', async () => {
-      const activeRun = run({
-        id: 1,
-        status: 'queued',
-        conclusion: null,
-        head_branch: 'feature',
-      });
-      const { client, paginate } = clientWithRunPages([], [[activeRun]], []);
-
-      await expect(client.runs('org', 'repo', 123)).resolves.toEqual([activeRun]);
-      const statusOptions = paginate.mock.calls.map(([, options]) => options);
-      expect(statusOptions.map((options) => options.status)).toEqual([
-        'in_progress',
-        'queued',
-        'waiting',
-      ]);
-      for (const options of statusOptions) {
-        expect(options).not.toHaveProperty('branch');
-      }
-    });
-
     it('does not cap discovered active runs before predecessor filtering', async () => {
       const newerActivePages = Array.from({ length: 5 }, (_, pageIndex) =>
         Array.from({ length: 100 }, (_, runIndex) =>
@@ -990,56 +1223,6 @@ describe('github', () => {
         [],
       );
       expect(pagesScanned()).toBe(50);
-    });
-
-    it('uses the repo-level active runs endpoint for cross-workflow queue discovery', async () => {
-      const activeRun = run({
-        id: 1,
-        status: 'queued',
-        conclusion: null,
-        display_title: 'deploy-api',
-        name: 'deploy-api',
-      });
-      const { client, paginate } = clientWithRunPages([], [[activeRun]], []);
-
-      await expect(
-        client.activeRunsForRepo('org', 'repo', { queueName: 'deploy-api' }),
-      ).resolves.toEqual([activeRun]);
-      expect(paginate).toHaveBeenCalledTimes(ACTIVE_RUN_STATUSES.length);
-      expect(paginate.mock.calls.every(([, options]) => !('workflow_id' in options))).toBe(true);
-      expect(paginate.mock.calls.map(([, options]) => options.status)).toEqual(ACTIVE_RUN_STATUSES);
-    });
-
-    it('forwards abort signals through workflow and repository run pagination', async () => {
-      const signal = new AbortController().signal;
-      const { client, listWorkflowRuns, listWorkflowRunsForRepo, paginate } = clientWithRunPages(
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-      );
-
-      await client.runs('org', 'repo', 123, {}, { signal });
-      await client.activeRunsForRepo('org', 'repo', {}, { signal });
-
-      expect(paginate).toHaveBeenCalledTimes(ACTIVE_RUN_STATUSES.length * 2);
-      expect(listWorkflowRuns.defaults).toHaveBeenCalledTimes(ACTIVE_RUN_STATUSES.length);
-      expect(listWorkflowRunsForRepo.defaults).toHaveBeenCalledTimes(ACTIVE_RUN_STATUSES.length);
-      expect(listWorkflowRuns.defaults).toHaveBeenCalledWith({ request: { signal } });
-      expect(listWorkflowRunsForRepo.defaults).toHaveBeenCalledWith({ request: { signal } });
-      expect(paginate.mock.calls.every(([, options]) => !('request' in options))).toBe(true);
-      expect(
-        paginate.mock.calls
-          .slice(0, ACTIVE_RUN_STATUSES.length)
-          .every(([request]) => request === listWorkflowRuns.bound),
-      ).toBe(true);
-      expect(
-        paginate.mock.calls
-          .slice(ACTIVE_RUN_STATUSES.length)
-          .every(([request]) => request === listWorkflowRunsForRepo.bound),
-      ).toBe(true);
     });
   });
 
